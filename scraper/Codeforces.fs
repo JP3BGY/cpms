@@ -98,7 +98,7 @@ let codeforces ()=
             let ctx = getDataContext()
             eprintfn "contest %d" contestId
             let prDict =  
-                            let participantsRating=Http.RequestString("https://codeforces.com/api/contest.ratingChanges?contestId="+contestId.ToString())|>JsonValue.Parse
+                            let participantsRating=Http.RequestString("https://codeforces.com/api/contest.ratingChanges?contestId="+contestId.ToString(),silentHttpErrors=True)|>JsonValue.Parse
                             if participantsRating?status.AsString() = "OK" then participantsRatingDict (participantsRating?result.AsArray()) else Map.empty
             let  problemsAndParticipants =Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString())|>JsonValue.Parse
             eprintfn "prDict %s" (prDict.ToString()) 
