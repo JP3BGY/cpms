@@ -120,7 +120,7 @@ let codeforces ()=
             ctx.SubmitUpdates()|>ignore
             eprintfn "Problem Solver"
             transaction.Complete()
-            eprintf "%d done" contestId
+            eprintfn "%d done" contestId
             transaction.Dispose()
             GC.Collect()
             ()
