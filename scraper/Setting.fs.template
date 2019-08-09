@@ -1,0 +1,16 @@
+module Setting 
+open System
+open FSharp.Data.Sql
+type SqlConnector = SqlDataProvider<
+                        Common.DatabaseProviderTypes.,
+                        "",
+                        UseOptionTypes = true
+                    >
+let getDataContext () = SqlConnector.GetDataContext(
+                            {
+                                    Timeout=TimeSpan.MaxValue
+                                    IsolationLevel=FSharp.Data.Sql.Transactions.IsolationLevel.DontCreateTransaction
+                            }:FSharp.Data.Sql.Transactions.TransactionOptions
+)
+
+let gCachePrefix = "ContestScraper"
