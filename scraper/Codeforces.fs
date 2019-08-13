@@ -106,6 +106,7 @@ let codeforces ()=
         ()
 
     let insertContestAndProblemsAndParticipants contestId =
+        let transactionopt = new TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
         try
             eprintfn "contest %d" contestId
             let prDict =  
@@ -117,7 +118,8 @@ let codeforces ()=
             let contestTime = problemsAndParticipants?result?contest?startTimeSeconds.AsInteger()
             eprintfn "prDict %s" (prDict.ToString()) 
             use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
-                                                   TimeSpan.Zero)
+                                                   transactionopt,
+                                                   TransactionScopeAsyncFlowOption.Enabled)
             let ctx = getDataContext()
 
             let contestElm = ctx.ContestLog.Contest.``Create(contestName, contestServerContestId, contest_server_contestServerId)``(problemsAndParticipants?result?contest?name.AsString(),
