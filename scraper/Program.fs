@@ -4,7 +4,8 @@ open MySql.Data.MySqlClient
 open MySqlConnector.Logging
 open Setting
 open Crawlers
-
+open UserCrawlers
+let AllCrawlerArray = [|crawlerLoop;userCrawlerLoop|]
 [<EntryPoint>]
 let main argv  = 
     //MySqlConnectorLogManager.set_Provider(new ConsoleLoggerProvider(MySqlConnectorLogLevel.Trace))
@@ -31,5 +32,5 @@ let main argv  =
             eprintfn "MySQL Submit Error"
             eprintfn "%s" me.Message
             exit(1)
-    crawlerLoop()
+    AllCrawlerArray|>Async.Parallel|>Async.RunSynchronously|>ignore
     0

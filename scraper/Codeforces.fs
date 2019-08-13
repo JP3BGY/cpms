@@ -1,5 +1,6 @@
 module Codeforces
 open Setting
+open Submission
 open System
 open System.IO
 open System.Net
@@ -37,7 +38,7 @@ let codeforces ()=
 
     let insertProblem contestId problem =
         let ctx = getDataContext()
-        let problemElm = ctx.ContestLog.Problem.``Create(contestServerProblemId, contest_contestId, problemName)``(problem?name.AsString(),contestId,problem?index.AsString())
+        let problemElm = ctx.ContestLog.Problem.``Create(contestServerProblemId, contest_contestId, problemName)``(problem?index.AsString(),contestId,problem?name.AsString())
         ctx.SubmitUpdates()
         eprintfn "problemDbId %d" problemElm.ProblemId
         match problem.TryGetProperty("rating") with
@@ -69,7 +70,7 @@ let codeforces ()=
                                             JsonValue.Parse(c)?result.AsArray()
                                     | Some(x) -> JsonValue.Parse(x)?result.AsArray()
                 let idx = ~~~ (System.Array.BinarySearch(ratingChanges,JsonValue.Parse("{\"ratingUpdateTimeSeconds\": "+(contestTime.ToString())+" }"),
-                                                                                        ComparisonIdentity.FromFunction(fun x y -> Operators.compare (x?ratingUpdateTimeSeconds.AsInteger()) (y?ratingUpdateTimeSeconds.AsInteger()) )))
+                                                                                        ComparisonIdentity.FromFunction(fun x y -> Operators.compare (x?ratingUpdateTimeSeconds.AsInteger64()) (y?ratingUpdateTimeSeconds.AsInteger64()) )))
                 if ratingChanges.Length =0 then 1500 else if idx = 0 then ratingChanges.[idx]?newRating.AsInteger() else ratingChanges.[idx-1]?newRating.AsInteger()
 
     let filterSolver ranking probidx =
@@ -115,7 +116,7 @@ let codeforces ()=
             let  problemsAndParticipants =Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString())|>JsonValue.Parse
             (extractUsers (problemsAndParticipants?result?rows.AsArray()))
                 |>fun x ->makeParticipantsRatingCache x prDict|>ignore
-            let contestTime = problemsAndParticipants?result?contest?startTimeSeconds.AsInteger()
+            let contestTime = problemsAndParticipants?result?contest?startTimeSeconds.AsInteger64()
             eprintfn "prDict %s" (prDict.ToString()) 
             use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
                                                    transactionopt,
@@ -184,3 +185,95 @@ let codeforces ()=
             eprintfn "API Connection Error %s" we.Message
             ()
     }
+
+let userCodeforces () =
+    eprintfn "userCodeforces Start!"
+    let contestServerDbId=
+        let ctx=getDataContext()
+        query{
+        for contest in ctx.ContestLog.ContestServer do
+            where (contest.ContestServerName="Codeforces")
+            select contest.ContestServerId
+            exactlyOne
+        }
+    let convertVerdict2SubmissionStatus verdict =
+        match verdict with
+        |"OK" -> SubmissionStatus.AC
+        |"PARTIAL"->SubmissionStatus.PAC
+        |"COMPILATION_ERROR"->SubmissionStatus.CE
+        |"RUNTIME_ERROR"->SubmissionStatus.RE
+        |"WRONG_ANSWER"->SubmissionStatus.WA
+        |"PRESENTATION_ERROR"->SubmissionStatus.PE
+        |"TIME_LIMIT_EXCEEDED"->SubmissionStatus.TLE
+        |"MEMORY_LIMIT_EXCEEDED"->SubmissionStatus.MLE
+        |"IDLENESS_LIMIT_EXCEEDED"->SubmissionStatus.TLE
+        |"SECURITY_VIOLATED"->SubmissionStatus.RE
+        |"CRASHED"->SubmissionStatus.WJ
+        |"INPUT_PREPARATION_CRASHED"->SubmissionStatus.WJ
+        |"CHALLENGED"->SubmissionStatus.WA
+        |"SKIPPED"->SubmissionStatus.WJ
+        |"TESTING"->SubmissionStatus.WJ
+        |"REJECTED"->SubmissionStatus.IG
+        |x->
+            eprintfn "convertVerdict2SubmissionStatus %s" x
+            SubmissionStatus.IG
+    let getUserSubmissions handle =
+        let submissions=Http.RequestString("https://codeforces.com/api/user.status?handle="+handle)
+                            |>JsonValue.Parse
+        let ret=
+            submissions?result.AsArray()
+                |>Array.map(fun submission ->
+                                (submission?problem?contestId.AsInteger(),
+                                 submission?problem?index.AsString(),
+                                 submission?creationTimeSeconds.AsInteger64(),
+                                 (convertVerdict2SubmissionStatus (submission?verdict.AsString())),
+                                 submission?id.AsInteger64()))
+                |>Array.filter(fun (_,_,_,ss,_)->(ss=SubmissionStatus.WJ)||(ss=SubmissionStatus.IG))
+        (handle,ret)
+    let insertUserSubmissions (handle,submissions) =
+        let ctx=getDataContext()
+        let userDbId = query{
+            for user in ctx.ContestLog.ContestUsers do
+                where (user.ContestServerContestServerId=contestServerDbId&&user.ContestUserId=handle)
+                select user.UserId
+                exactlyOne
+        }
+        let insertUserSubmission (contestId,problemIndex,creationTime,ss,submissionId) =
+            let contestDbId = query{
+                for contest in ctx.ContestLog.Contest do
+                    where ((contest.ContestServerContestServerId=contestServerDbId)&&(contest.ContestServerContestId=contestId.ToString()))
+                    select contest.ContestId
+                    exactlyOne
+            }
+            let problemDbId = query{
+                for problem in ctx.ContestLog.Problem do
+                    where ((problem.ContestContestId=contestDbId)&&(problem.ContestServerProblemId=problemIndex))
+                    select problem.ProblemId
+                    exactlyOne
+            }
+            let isNotInDb = 
+                query{
+                    for submission in ctx.ContestLog.ProblemSubmissions do
+                        where (submission.ContestServerSubmissonId = submissionId && submission.ContestUsersUserId=userDbId && submission.ProblemProblemId=problemDbId)
+                }|>Seq.isEmpty
+            if isNotInDb then 
+                ctx.ContestLog.ProblemSubmissions.``Create(contestServerSubmissonId, contest_users_userId, problem_problemId, submission_status, submission_time)`` (submissionId,userDbId,problemDbId,submissionStatusToString ss,creationTime)
+                |>ignore
+                ctx.SubmitUpdates()
+                ()
+                else ()
+        submissions|>Array.map(insertUserSubmission)|>ignore
+        ()
+            
+        
+    let ctx = getDataContext()
+    let handles = 
+        query{
+            for watchingUser in ctx.ContestLog.WatchingUser do
+                for user in ctx.ContestLog.ContestUsers do
+                    where (user.UserId = watchingUser.ContestUsersUserId)
+                    select user.ContestUserId
+        }|>Seq.toList
+    handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
+    eprintfn "userCodeforces ends"
+    ()

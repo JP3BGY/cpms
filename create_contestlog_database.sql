@@ -163,20 +163,37 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `contest_log`.`problem_solver`
+-- Table `contest_log`.`problem_submissions`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `contest_log`.`problem_solver` (
+CREATE TABLE IF NOT EXISTS `contest_log`.`problem_submissions` (
   `problem_problemId` INT NOT NULL,
   `contest_users_userId` INT NOT NULL,
+  `submission_time` BIGINT NOT NULL,
+  `submission_status` VARCHAR(5) NOT NULL,
+  `contestServerSubmissonId` BIGINT NOT NULL,
   INDEX `fk_problem_solver_problem1_idx` (`problem_problemId` ) ,
   INDEX `fk_problem_solver_contest_users1_idx` (`contest_users_userId` ) ,
-  PRIMARY KEY (`problem_problemId`, `contest_users_userId`),
+  PRIMARY KEY (`problem_problemId`, `contest_users_userId`, `contestServerSubmissonId`),
   CONSTRAINT `fk_problem_solver_problem1`
     FOREIGN KEY (`problem_problemId`)
     REFERENCES `contest_log`.`problem` (`problemId`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_problem_solver_contest_users1`
+    FOREIGN KEY (`contest_users_userId`)
+    REFERENCES `contest_log`.`contest_users` (`userId`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`watching_user`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`watching_user` (
+  `contest_users_userId` INT NOT NULL,
+  PRIMARY KEY (`contest_users_userId`),
+  CONSTRAINT `fk_watching_user_contest_users1`
     FOREIGN KEY (`contest_users_userId`)
     REFERENCES `contest_log`.`contest_users` (`userId`)
     ON DELETE NO ACTION

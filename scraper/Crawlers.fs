@@ -11,13 +11,17 @@ let crawlerArray=[|
 let delCacheArray=[|
     cfDeleteAllCache
 |]
-
-let rec crawlerLoop ()=
+let rec internalCrawlerLoop ()=
     crawlerArray|>Array.map(fun x-> x())|>Async.Parallel|>Async.RunSynchronously|>ignore
     delCacheArray|>Array.map(fun x->x())|>ignore
     Threading.Thread.Sleep(TimeSpan.FromHours(4.0))
     if Console.KeyAvailable then 
         match Console.ReadKey().Key with
         | ConsoleKey.Q -> ()
-        | _ -> crawlerLoop()
-        else crawlerLoop()
+        | _ -> internalCrawlerLoop()
+        else internalCrawlerLoop()
+
+let crawlerLoop =
+    async{
+        internalCrawlerLoop()
+    }
