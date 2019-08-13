@@ -7,6 +7,7 @@ open System.Transactions
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open FSharp.Data.Runtime.Caching
+open MySql.Data
 let cfCachePrefix = "codeforces"
 let codeforcesCache = createInternetFileCache (Path.Combine(gCachePrefix,cfCachePrefix)) (TimeSpan.MaxValue)
 let cfDeleteAllCache () =
@@ -25,11 +26,12 @@ let codeforces ()=
     eprintfn "Codeforces crawler start!" |> ignore
     let contestServerId=
         let ctx=getDataContext()
-        (query{
+        query{
         for contest in ctx.ContestLog.ContestServer do
             where (contest.ContestServerName="Codeforces")
             select contest.ContestServerId
-        }|>Seq.head)
+            exactlyOne
+        }
     let participantsRatingDict participantsRating =
         participantsRating|>Array.map(fun x-> (x?handle.AsString(),x?newRating.AsInteger()))|>Map.ofArray
 
@@ -46,7 +48,18 @@ let codeforces ()=
         ctx.SubmitUpdates()
         problemElm.ProblemId
 
-    let getRating contestId handle (prDict:Map<string,int>) = 
+    let makeParticipantsRatingCache handles (prDict:Map<string,int>) =
+        handles|>Array.filter(fun x ->  not (prDict.ContainsKey x))|>
+                 Array.map(fun handle ->
+                                match codeforcesCache.TryRetrieve(handle) with
+                                | None -> 
+                                    let c = Http.RequestString("https://codeforces.com/api/user.rating?handle="+handle)
+                                    codeforcesCache.Set (handle,c)
+                                    ()
+                                | Some(x) ->
+                                    ())
+
+    let getRating contestTime handle (prDict:Map<string,int>) = 
         if prDict.ContainsKey(handle) then prDict.Item(handle) 
             else 
                 let ratingChanges = match codeforcesCache.TryRetrieve(handle) with
@@ -55,69 +68,84 @@ let codeforces ()=
                                             codeforcesCache.Set (handle, c)
                                             JsonValue.Parse(c)?result.AsArray()
                                     | Some(x) -> JsonValue.Parse(x)?result.AsArray()
-                let idx = ~~~ (System.Array.BinarySearch(ratingChanges,JsonValue.Parse("{\"contestId\": "+(contestId.ToString())+" }"),
-                                                                                        ComparisonIdentity.FromFunction(fun x y -> Operators.compare (x?contestId.AsInteger()) (y?contestId.AsInteger()) )))
+                let idx = ~~~ (System.Array.BinarySearch(ratingChanges,JsonValue.Parse("{\"ratingUpdateTimeSeconds\": "+(contestTime.ToString())+" }"),
+                                                                                        ComparisonIdentity.FromFunction(fun x y -> Operators.compare (x?ratingUpdateTimeSeconds.AsInteger()) (y?ratingUpdateTimeSeconds.AsInteger()) )))
                 if ratingChanges.Length =0 then 1500 else if idx = 0 then ratingChanges.[idx]?newRating.AsInteger() else ratingChanges.[idx-1]?newRating.AsInteger()
 
     let filterSolver ranking probidx =
-        ranking |> Array.filter (fun x -> x?problemResults.AsArray().[probidx]?points.AsInteger() > 0)|>Array.collect(fun x -> x?party?members.AsArray())|>Array.map(fun x-> x?handle.AsString())
+        ranking |> Array.filter (fun x -> x?problemResults.AsArray().[probidx]?points.AsFloat() > 0.0)|>Array.collect(fun x -> x?party?members.AsArray())|>Array.map(fun x-> x?handle.AsString())
     
     let extractUsers ranking =
         ranking|> Array.collect(fun x -> x?party?members.AsArray())|>Array.map(fun x -> x?handle.AsString())
 
     let getOrInsertUser handle = 
         let ctx = getDataContext()
-        let userQuery = query{
-            for user in ctx.ContestLog.ContestUsers do
-                where (user.ContestUserId = handle && user.ContestServerContestServerId = contestServerId)
-        }
-        let ret = if Seq.isEmpty userQuery then 
-                            ctx.ClearUpdates()|>ignore
-                            ctx.ContestLog.ContestUsers.``Create(contestUserId, contest_server_contestServerId)``(handle,contestServerId) 
-                        else 
-                            Seq.head userQuery
-        ctx.SubmitUpdates()
-        ret
-    let insertSolversInContest contestId problemDbId handles prDict =
+        try
+            query{
+                for user in ctx.ContestLog.ContestUsers do
+                    where (user.ContestUserId = handle && user.ContestServerContestServerId = contestServerId)
+                    exactlyOne
+            }
+        with
+        | :? InvalidOperationException as oe ->
+            let ret =                                 
+                ctx.ContestLog.ContestUsers.``Create(contestUserId, contest_server_contestServerId)``(handle,contestServerId) 
+            ctx.SubmitUpdates()
+            ret
+
+    let insertSolversInContest contestTime problemDbId handles prDict =
         let ctx = getDataContext()
         eprintfn "insertSolversInContest problemDbId %d" problemDbId
         handles|>Array.map(getOrInsertUser)
-               |>Array.map(fun x -> let ret=ctx.ContestLog.ProblemSolverInContest.``Create(contest_users_userId, problem_problemId, rating)``(x.UserId,problemDbId,(getRating contestId x.ContestUserId prDict))
-                                    ctx.SubmitUpdates()
-                                    ret)
+               |>Array.map(fun x -> 
+                                let ret=ctx.ContestLog.ProblemSolverInContest.``Create(contest_users_userId, problem_problemId, rating)``(x.UserId,problemDbId,(getRating contestTime x.ContestUserId prDict))
+                                ctx.SubmitUpdates()
+                                ret)
                |>ignore
         ctx.SubmitUpdates()
         ()
 
     let insertContestAndProblemsAndParticipants contestId =
-        let transactionopt = System.Transactions.TransactionOptions(Timeout=TimeSpan.MaxValue,IsolationLevel=IsolationLevel.Serializable)
         try
-            use transaction = new TransactionScope(TransactionScopeOption.Required,
-                                                   transactionopt,
-                                                   System.Transactions.TransactionScopeAsyncFlowOption.Enabled)
-            let ctx = getDataContext()
             eprintfn "contest %d" contestId
             let prDict =  
-                            let participantsRating=Http.RequestString("https://codeforces.com/api/contest.ratingChanges?contestId="+contestId.ToString(),silentHttpErrors=True)|>JsonValue.Parse
-                            if participantsRating?status.AsString() = "OK" then participantsRatingDict (participantsRating?result.AsArray()) else Map.empty
+                let participantsRating=Http.RequestString("https://codeforces.com/api/contest.ratingChanges?contestId="+contestId.ToString(),silentHttpErrors=true)|>JsonValue.Parse
+                if participantsRating?status.AsString() = "OK" then participantsRatingDict (participantsRating?result.AsArray()) else Map.empty
             let  problemsAndParticipants =Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString())|>JsonValue.Parse
+            (extractUsers (problemsAndParticipants?result?rows.AsArray()))
+                |>fun x ->makeParticipantsRatingCache x prDict|>ignore
+            let contestTime = problemsAndParticipants?result?contest?startTimeSeconds.AsInteger()
             eprintfn "prDict %s" (prDict.ToString()) 
+            use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
+                                                   TimeSpan.Zero)
+            let ctx = getDataContext()
 
-            let contestElm = ctx.ContestLog.Contest.``Create(contestName, contestServerContestId, contest_server_contestServerId)``(problemsAndParticipants?result?contest?name.AsString(),problemsAndParticipants?result?contest?id.AsInteger().ToString(),contestServerId)
+            let contestElm = ctx.ContestLog.Contest.``Create(contestName, contestServerContestId, contest_server_contestServerId)``(problemsAndParticipants?result?contest?name.AsString(),
+                                                                                                                                    problemsAndParticipants?result?contest?id.AsInteger().ToString(),
+                                                                                                                                    contestServerId)
             ctx.SubmitUpdates()
             eprintfn "contestDbId %d" contestElm.ContestId
 
             let problemIdArr = problemsAndParticipants?result?problems.AsArray()|>Array.map(insertProblem contestElm.ContestId)
-            eprintfn "problemIdArr %s" (problemIdArr.ToString())
 
-            (extractUsers (problemsAndParticipants?result?rows.AsArray()))|>Array.map(getOrInsertUser)|>ignore
-            (extractUsers (problemsAndParticipants?result?rows.AsArray()))|>Array.map(fun x-> getRating contestId x prDict)|>Array.map(fun x->ctx.ContestLog.ContestParticipants.``Create(contest_contestId, rating)``(contestElm.ContestId,x))|>ignore
+            (extractUsers (problemsAndParticipants?result?rows.AsArray()))
+                |>Array.map(getOrInsertUser)|>ignore
+            (extractUsers (problemsAndParticipants?result?rows.AsArray()))
+                |>Array.map(fun x-> getRating contestTime x prDict)
+                |>Array.map(fun x->
+                                let ret=ctx.ContestLog.ContestParticipants.``Create(contest_contestId, rating)``(contestElm.ContestId,x)
+                                ctx.SubmitUpdates()
+                                ret)|>ignore
             eprintfn "Participants"
 
-            let problemSolverInContestArr = [|0..problemIdArr.Length-1|]|>Array.map(fun x -> (problemIdArr.[x],filterSolver (problemsAndParticipants?result?rows.AsArray()) x))
+            let problemSolverInContestArr = 
+                [|0..problemIdArr.Length-1|]
+                    |>Array.map(fun x -> (problemIdArr.[x],
+                                          filterSolver (problemsAndParticipants?result?rows.AsArray()) x))
             eprintfn "problemSolverInContestArr"
-            problemSolverInContestArr|>Array.map(fun (problemDbId,solvers)->insertSolversInContest contestId problemDbId solvers prDict)|>ignore
-            ctx.SubmitUpdates()|>ignore
+            problemSolverInContestArr
+                |>Array.map(fun (problemDbId,solvers)->insertSolversInContest contestTime problemDbId solvers prDict)|>ignore
+            ctx.SubmitUpdates()
             eprintfn "Problem Solver"
             transaction.Complete()
             eprintfn "%d done" contestId
@@ -141,14 +169,16 @@ let codeforces ()=
                     where ((contest.ContestServerContestId = contestId) && (contest.ContestServerContestServerId = contestServerId))
             }
         not (Seq.isEmpty elm)
-    try
-        let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
-        let  contestsJson=JsonValue.Parse(contestsRes)
-        contestsJson?result.AsArray()|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
-                                     |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
-        eprintfn "Update Done"
-        ()
-    with
-    | :? WebException as we ->
-        eprintfn "API Connection Error %s" we.Message
-        ()
+    async{
+        try
+            let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
+            let  contestsJson=JsonValue.Parse(contestsRes)
+            contestsJson?result.AsArray()|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
+                                         |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
+            eprintfn "Update Done"
+            ()
+        with
+        | :? WebException as we ->
+            eprintfn "API Connection Error %s" we.Message
+            ()
+    }

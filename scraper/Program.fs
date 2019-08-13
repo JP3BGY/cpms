@@ -1,14 +1,16 @@
 ﻿module Scraper
 open FSharp.Data.Sql
 open MySql.Data.MySqlClient
-open MySqlConnector
 open MySqlConnector.Logging
 open Setting
 open Crawlers
 
 [<EntryPoint>]
 let main argv  = 
-    //MySqlConnectorLogManager.set_Provider(new ConsoleLoggerProvider(MySqlConnectorLogLevel.Debug))
+    //MySqlConnectorLogManager.set_Provider(new ConsoleLoggerProvider(MySqlConnectorLogLevel.Trace))
+    //Common.QueryEvents.SqlQueryEvent.Add(fun x -> eprintfn "[SQLProvider Events]Query Event Command:%s %s" x.Command (x.ConnectionStringHash.ToString())
+    //                                              x.Parameters|>Seq.map(fun (x,y)->eprintfn "    Parameters: %s , %s" x (y.ToString()))|>ignore
+    //                                              ())
     let ctx = getDataContext()
     initArray|>Array.map(fun (name,url)->
                                         let exists=query{

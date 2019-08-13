@@ -13,8 +13,8 @@ let delCacheArray=[|
 |]
 
 let rec crawlerLoop ()=
-    Threading.Thread.Sleep(500)
-    codeforces()
+    Threading.Thread.Sleep(TimeSpan.FromHours(4.0))
+    crawlerArray|>Array.map(fun x-> x())|>Async.Parallel|>Async.RunSynchronously|>ignore
     delCacheArray|>Array.map(fun x->x())|>ignore
     if Console.KeyAvailable then 
         match Console.ReadKey().Key with
