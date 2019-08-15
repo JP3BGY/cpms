@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS `contest_log`.`contest` (
   `contestName` VARCHAR(256) NOT NULL,
   `contest_server_contestServerId` INT NOT NULL,
   `contestServerContestId` VARCHAR(256) NOT NULL,
+  `contestStartTime` BIGINT NOT NULL,
   PRIMARY KEY (`contestId`),
   INDEX `fk_contest_contest_server1_idx` (`contest_server_contestServerId` ) ,
   UNIQUE INDEX `contestId_UNIQUE` (`contestId` ) ,
@@ -196,6 +197,44 @@ CREATE TABLE IF NOT EXISTS `contest_log`.`watching_user` (
   CONSTRAINT `fk_watching_user_contest_users1`
     FOREIGN KEY (`contest_users_userId`)
     REFERENCES `contest_log`.`contest_users` (`userId`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`contest_tag`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`contest_tag` (
+  `contest_contestId` INT NOT NULL,
+  `contest_tag` VARCHAR(45) NOT NULL,
+  `is_created` TINYINT NOT NULL,
+  INDEX `fk_contest_tag_contest1_idx` (`contest_contestId` ) ,
+  PRIMARY KEY (`contest_contestId`, `contest_tag`),
+  CONSTRAINT `fk_contest_tag_contest1`
+    FOREIGN KEY (`contest_contestId`)
+    REFERENCES `contest_log`.`contest` (`contestId`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`contest_before_end`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`contest_before_end` (
+  `contest_server_contestServerId` INT NOT NULL,
+  `contest_before_end_id` INT NOT NULL AUTO_INCREMENT,
+  `contestServerContestId` VARCHAR(256) NOT NULL,
+  `contestServerContestName` VARCHAR(256) NOT NULL,
+  `contestStartTime` BIGINT NOT NULL,
+  `contestEndTime` BIGINT NOT NULL,
+  INDEX `fk_contest_before_end_contest_server1_idx` (`contest_server_contestServerId` ) ,
+  PRIMARY KEY (`contest_before_end_id`),
+  UNIQUE INDEX `contest_before_end_key` (`contestServerContestId` , `contest_server_contestServerId` ) ,
+  CONSTRAINT `fk_contest_before_end_contest_server1`
+    FOREIGN KEY (`contest_server_contestServerId`)
+    REFERENCES `contest_log`.`contest_server` (`contestServerId`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;

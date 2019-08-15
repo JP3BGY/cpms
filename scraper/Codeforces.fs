@@ -45,7 +45,9 @@ let codeforces ()=
         | None -> ()
         | Some(x) -> ctx.ContestLog.ProblemDifficulty.``Create``(problem?rating.AsFloat(),problemElm.ProblemId)|>ignore
                      ctx.SubmitUpdates()
-        problem?tags.AsArray()|>Array.map(fun x-> ctx.ContestLog.ProblemTag.``Create(is_created, problem_problemId, tag)``(0y,problemElm.ProblemId,x.AsString()))|>ignore
+        problem?tags.AsArray()|>Array.map(fun x-> x.AsString())
+            |>(Array.distinctBy (fun x->x.ToUpper()))
+            |>Array.map(fun x-> ctx.ContestLog.ProblemTag.``Create(is_created, problem_problemId, tag)``(0y,problemElm.ProblemId,x))|>ignore
         ctx.SubmitUpdates()
         problemElm.ProblemId
 
@@ -123,9 +125,11 @@ let codeforces ()=
                                                    TransactionScopeAsyncFlowOption.Enabled)
             let ctx = getDataContext()
 
-            let contestElm = ctx.ContestLog.Contest.``Create(contestName, contestServerContestId, contest_server_contestServerId)``(problemsAndParticipants?result?contest?name.AsString(),
-                                                                                                                                    problemsAndParticipants?result?contest?id.AsInteger().ToString(),
-                                                                                                                                    contestServerId)
+            let contestElm = ctx.ContestLog.Contest.``Create(contestName, contestServerContestId, contestStartTime, contest_server_contestServerId)`` 
+                                                           (problemsAndParticipants?result?contest?name.AsString(),
+                                                            problemsAndParticipants?result?contest?id.AsInteger().ToString(),
+                                                            problemsAndParticipants?result?contest?startTimeSeconds.AsInteger64(),
+                                                            contestServerId)
             ctx.SubmitUpdates()
             eprintfn "contestDbId %d" contestElm.ContestId
 
@@ -157,7 +161,11 @@ let codeforces ()=
             ()
         with
         | :? WebException as we -> 
-            eprintfn "Can't save contest %d %s" contestId we.Message
+            eprintfn "Can't save contest %d %s" contestId we.Message 
+            Console.Error.WriteLine("uri:{0}",we.Response.ResponseUri)
+            use data = we.Response.GetResponseStream()
+            let streamr=new StreamReader(data)
+            eprintfn "%s" (streamr.ReadToEnd())
             GC.Collect()
             ()
         | :? TransactionAbortedException as te ->
@@ -175,9 +183,33 @@ let codeforces ()=
     async{
         try
             let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
-            let  contestsJson=JsonValue.Parse(contestsRes)
-            contestsJson?result.AsArray()|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
-                                         |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
+            let  contestsArr=JsonValue.Parse(contestsRes)?result.AsArray()
+            contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() <> "FINISHED")
+                       |>Array.map(fun contestJson -> 
+                                        eprintfn "before end %s" (contestJson?name.AsString())
+                                        let ctx=getDataContext()
+                                        ctx.ContestLog.ContestBeforeEnd.``Create(contestEndTime, contestServerContestId, contestServerContestName, contestStartTime, contest_server_contestServerId)``
+                                                                               (
+                                                                                   contestJson?startTimeSeconds.AsInteger64()+contestJson?durationSeconds.AsInteger64(),
+                                                                                   contestJson?id.AsInteger().ToString(),
+                                                                                   contestJson?name.AsString(),
+                                                                                   contestJson?startTimeSeconds.AsInteger64(),
+                                                                                   contestServerId
+                                                                               ))
+                       |>ignore
+
+            contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
+                       |>Array.map(fun x->
+                                        let ctx=getDataContext()
+                                        query{
+                                            for contestbe in ctx.ContestLog.ContestBeforeEnd do
+                                                where (contestbe.ContestServerContestServerId=contestServerId&&contestbe.ContestServerContestId=(x?id.AsInteger().ToString()))
+                                        }    
+                                            |>FSharp.Data.Sql.Seq.``delete all items from single table``  |>Async.RunSynchronously|>ignore
+                                        ()
+                       )|>ignore
+            contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
+                       |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
             eprintfn "Update Done"
             ()
         with
