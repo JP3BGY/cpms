@@ -23,7 +23,7 @@ let cfDeleteAllCache () =
     for di in dir.GetDirectories() do
         di.Delete()
     ()
-let codeforces ()=
+let rec codeforces ()=
     eprintfn "Codeforces crawler start!" |> ignore
     let contestServerId=
         let ctx=getDataContext()
@@ -195,9 +195,9 @@ let codeforces ()=
                                                                                    contestJson?name.AsString(),
                                                                                    contestJson?startTimeSeconds.AsInteger64(),
                                                                                    contestServerId
-                                                                               ))
+                                                                               )|>ignore
+                                        ctx.SubmitUpdates())
                        |>ignore
-
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
                        |>Array.map(fun x->
                                         let ctx=getDataContext()
@@ -211,11 +211,27 @@ let codeforces ()=
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
                        |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
             eprintfn "Update Done"
-            ()
+            cfDeleteAllCache()|>ignore
+            let ctx = getDataContext()
+            let cnt = query{
+                for contestbe in ctx.ContestLog.ContestBeforeEnd do
+                    count
+            }
+            let nextCrawleTime = if cnt = 0 then TimeSpan.FromHours(3.0) 
+                                    else
+                                        let nowunixtime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                                        query{
+                                            for contestbe in ctx.ContestLog.ContestBeforeEnd do
+                                                sortBy (contestbe.ContestStartTime)
+                                                select (contestbe.ContestStartTime,contestbe.ContestEndTime)
+                                        }|>Seq.map(fun (x,y)-> TimeSpan.FromSeconds(float (if x-nowunixtime<0L then y-nowunixtime else x-nowunixtime)))|>Seq.min
+            Threading.Thread.Sleep(nextCrawleTime)
+            codeforces()|>Async.RunSynchronously|>ignore
         with
         | :? WebException as we ->
             eprintfn "API Connection Error %s" we.Message
-            ()
+            Threading.Thread.Sleep(TimeSpan.FromSeconds(1.0))
+            codeforces()|>Async.RunSynchronously|>ignore
     }
 
 let userCodeforces () =

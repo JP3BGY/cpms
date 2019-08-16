@@ -8,18 +8,8 @@ let initArray=[|
 let crawlerArray=[|
     codeforces
 |]
-let delCacheArray=[|
-    cfDeleteAllCache
-|]
 let rec internalCrawlerLoop ()=
     crawlerArray|>Array.map(fun x-> x())|>Async.Parallel|>Async.RunSynchronously|>ignore
-    delCacheArray|>Array.map(fun x->x())|>ignore
-    Threading.Thread.Sleep(TimeSpan.FromHours(4.0))
-    if Console.KeyAvailable then 
-        match Console.ReadKey().Key with
-        | ConsoleKey.Q -> ()
-        | _ -> internalCrawlerLoop()
-        else internalCrawlerLoop()
 
 let crawlerLoop =
     async{
