@@ -185,6 +185,14 @@ let rec codeforces ()=
             let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
             let  contestsArr=JsonValue.Parse(contestsRes)?result.AsArray()
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() <> "FINISHED")
+                       |>Array.filter(fun contestJson ->
+                                          let ctx = getDataContext()
+                                          let cnt = query{
+                                              for contestbe in ctx.ContestLog.ContestBeforeEnd do
+                                                where (contestbe.ContestServerContestId=contestJson?id.AsInteger().ToString()&&contestbe.ContestServerContestServerId=contestServerId)
+                                                count
+                                          }
+                                          cnt=0)
                        |>Array.map(fun contestJson -> 
                                         eprintfn "before end %s" (contestJson?name.AsString())
                                         let ctx=getDataContext()
@@ -212,11 +220,13 @@ let rec codeforces ()=
                        |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
             eprintfn "Update Done"
             cfDeleteAllCache()|>ignore
+            eprintfn "Delete all cache"
             let ctx = getDataContext()
             let cnt = query{
                 for contestbe in ctx.ContestLog.ContestBeforeEnd do
                     count
             }
+            eprintfn "count:%d" cnt
             let nextCrawleTime = if cnt = 0 then TimeSpan.FromHours(3.0) 
                                     else
                                         let nowunixtime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
@@ -224,7 +234,9 @@ let rec codeforces ()=
                                             for contestbe in ctx.ContestLog.ContestBeforeEnd do
                                                 sortBy (contestbe.ContestStartTime)
                                                 select (contestbe.ContestStartTime,contestbe.ContestEndTime)
-                                        }|>Seq.map(fun (x,y)-> TimeSpan.FromSeconds(float (if x-nowunixtime<0L then y-nowunixtime else x-nowunixtime)))|>Seq.min
+                                                take 1
+                                        }|>Seq.map(fun (x,y)-> TimeSpan.FromSeconds(float (if x-nowunixtime<0L then y-nowunixtime else x-nowunixtime)))|>Seq.head
+            Console.WriteLine ("SleepTime {0}",nextCrawleTime)
             Threading.Thread.Sleep(nextCrawleTime)
             codeforces()|>Async.RunSynchronously|>ignore
         with
