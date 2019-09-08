@@ -230,12 +230,14 @@ let rec codeforces ()=
             let nextCrawleTime = if cnt = 0 then TimeSpan.FromHours(3.0) 
                                     else
                                         let nowunixtime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-                                        query{
-                                            for contestbe in ctx.ContestLog.ContestBeforeEnd do
-                                                sortBy (contestbe.ContestStartTime)
-                                                select (contestbe.ContestStartTime,contestbe.ContestEndTime)
-                                                take 1
-                                        }|>Seq.map(fun (x,y)-> TimeSpan.FromSeconds(float (if x-nowunixtime<0L then y-nowunixtime else x-nowunixtime)))|>Seq.head
+                                        let time=
+                                            query{
+                                                for contestbe in ctx.ContestLog.ContestBeforeEnd do
+                                                    sortBy (contestbe.ContestStartTime)
+                                                    select (contestbe.ContestStartTime,contestbe.ContestEndTime)
+                                                    take 1
+                                            }|>Seq.map(fun (x,y)-> TimeSpan.FromSeconds(float (if x-nowunixtime<0L then y-nowunixtime else x-nowunixtime)))|>Seq.head
+                                        max time (TimeSpan.FromDays(1.0))
             Console.WriteLine ("SleepTime {0}",nextCrawleTime)
             Threading.Thread.Sleep(nextCrawleTime)
             codeforces()|>Async.RunSynchronously|>ignore
@@ -247,6 +249,7 @@ let rec codeforces ()=
     }
 
 let userCodeforces () =
+(*
     eprintfn "userCodeforces Start!"
     let contestServerDbId=
         let ctx=getDataContext()
@@ -336,4 +339,5 @@ let userCodeforces () =
         }|>Seq.toList
     handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
     eprintfn "userCodeforces ends"
+*)
     ()
