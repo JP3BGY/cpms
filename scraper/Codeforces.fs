@@ -237,7 +237,7 @@ let rec codeforces ()=
                                                     select (contestbe.ContestStartTime,contestbe.ContestEndTime)
                                                     take 1
                                             }|>Seq.map(fun (x,y)-> TimeSpan.FromSeconds(float (if x-nowunixtime<0L then y-nowunixtime else x-nowunixtime)))|>Seq.head
-                                        max time (TimeSpan.FromDays(1.0))
+                                        min time (TimeSpan.FromDays(1.0))
             Console.WriteLine ("SleepTime {0}",nextCrawleTime)
             Threading.Thread.Sleep(nextCrawleTime)
             codeforces()|>Async.RunSynchronously|>ignore
