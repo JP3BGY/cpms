@@ -189,14 +189,30 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
+-- Table `contest_log`.`user`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`user` (
+  `iduser` INT NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY (`iduser`),
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
 -- Table `contest_log`.`watching_user`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `contest_log`.`watching_user` (
   `contest_users_userId` INT NOT NULL,
-  PRIMARY KEY (`contest_users_userId`),
+  `user_iduser` INT NOT NULL,
+  PRIMARY KEY (`contest_users_userId`, `user_iduser`),
+  INDEX `fk_watching_user_user1_idx` (`user_iduser` ) ,
   CONSTRAINT `fk_watching_user_contest_users1`
     FOREIGN KEY (`contest_users_userId`)
     REFERENCES `contest_log`.`contest_users` (`userId`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_watching_user_user1`
+    FOREIGN KEY (`user_iduser`)
+    REFERENCES `contest_log`.`user` (`iduser`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
@@ -240,6 +256,100 @@ CREATE TABLE IF NOT EXISTS `contest_log`.`contest_before_end` (
 ENGINE = InnoDB;
 
 
+-- -----------------------------------------------------
+-- Table `contest_log`.`virtual_contest`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`virtual_contest` (
+  `idvirtual_contest` INT NOT NULL AUTO_INCREMENT,
+  `startTime` BIGINT NOT NULL,
+  `endTime` BIGINT NOT NULL,
+  `createdUser_user_iduser` INT NOT NULL,
+  PRIMARY KEY (`idvirtual_contest`),
+  INDEX `fk_virtual_contest_user1_idx` (`createdUser_user_iduser` ) ,
+  CONSTRAINT `fk_virtual_contest_user1`
+    FOREIGN KEY (`createdUser_user_iduser`)
+    REFERENCES `contest_log`.`user` (`iduser`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`virtual_contest_problems`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`virtual_contest_problems` (
+  `virtual_contest_idvirtual_contest` INT NOT NULL,
+  `problem_problemId` INT NOT NULL,
+  PRIMARY KEY (`virtual_contest_idvirtual_contest`, `problem_problemId`),
+  INDEX `fk_virtual_contest_problems_problem1_idx` (`problem_problemId` ) ,
+  CONSTRAINT `fk_virtual_contest_problems_virtual_contest1`
+    FOREIGN KEY (`virtual_contest_idvirtual_contest`)
+    REFERENCES `contest_log`.`virtual_contest` (`idvirtual_contest`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_virtual_contest_problems_problem1`
+    FOREIGN KEY (`problem_problemId`)
+    REFERENCES `contest_log`.`problem` (`problemId`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`virtual_contest_participants`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`virtual_contest_participants` (
+  `virtual_contest_idvirtual_contest` INT NOT NULL,
+  `user_iduser` INT NOT NULL,
+  PRIMARY KEY (`virtual_contest_idvirtual_contest`, `user_iduser`),
+  INDEX `fk_virtual_contest_participants_user1_idx` (`user_iduser` ) ,
+  CONSTRAINT `fk_virtual_contest_participants_virtual_contest1`
+    FOREIGN KEY (`virtual_contest_idvirtual_contest`)
+    REFERENCES `contest_log`.`virtual_contest` (`idvirtual_contest`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_virtual_contest_participants_user1`
+    FOREIGN KEY (`user_iduser`)
+    REFERENCES `contest_log`.`user` (`iduser`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`problem_difficulty_from_data`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`problem_difficulty_from_data` (
+  `difficulty` DOUBLE NOT NULL,
+  `problem_problemId` INT NOT NULL,
+  PRIMARY KEY (`problem_problemId`),
+  CONSTRAINT `fk_problem_difficulty_from_data_problem1`
+    FOREIGN KEY (`problem_problemId`)
+    REFERENCES `contest_log`.`problem` (`problemId`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`user_github`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`user_github` (
+  `user_iduser` INT NOT NULL,
+  `login` VARCHAR(256) NOT NULL,
+  `email` VARCHAR(256) NOT NULL,
+  PRIMARY KEY (`user_iduser`),
+  UNIQUE INDEX `login_UNIQUE` (`login` ) ,
+  UNIQUE INDEX `email_UNIQUE` (`email` ) ,
+  CONSTRAINT `fk_user_github_user1`
+    FOREIGN KEY (`user_iduser`)
+    REFERENCES `contest_log`.`user` (`iduser`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+
