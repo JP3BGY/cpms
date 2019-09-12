@@ -1,6 +1,6 @@
-module Codeforces
-open Setting
-open Submission
+module Scraper.Codeforces
+open Scraper.Setting
+open Scraper.Submission
 open System
 open System.IO
 open System.Net
@@ -249,7 +249,6 @@ let rec codeforces ()=
     }
 
 let userCodeforces () =
-(*
     eprintfn "userCodeforces Start!"
     let contestServerDbId=
         let ctx=getDataContext()
@@ -339,5 +338,4 @@ let userCodeforces () =
         }|>Seq.toList
     handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
     eprintfn "userCodeforces ends"
-*)
     ()

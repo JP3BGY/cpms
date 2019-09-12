@@ -1,7 +1,7 @@
-module Crawlers
+module Scraper.Crawlers
 open System
-open Codeforces
-open Setting
+open Scraper.Codeforces
+open Scraper.Setting
 let initArray=[|
     ("Codeforces","https://codeforces.com")
 |]

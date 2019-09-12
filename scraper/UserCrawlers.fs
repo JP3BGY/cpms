@@ -1,8 +1,8 @@
-module UserCrawlers
-open Setting
+module Scraper.UserCrawlers
+open Scraper.Setting
 open System.Threading
 open System
-open Codeforces
+open Scraper.Codeforces
 let userCrawlerArray=
     [|
         userCodeforces;

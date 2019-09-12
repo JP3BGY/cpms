@@ -1,10 +1,10 @@
-﻿module Scraper
+﻿module Scraper.Main
 open FSharp.Data.Sql
 open MySql.Data.MySqlClient
 open MySqlConnector.Logging
-open Setting
-open Crawlers
-open UserCrawlers
+open Scraper.Setting
+open Scraper.Crawlers
+open Scraper.UserCrawlers
 let AllCrawlerArray = [|crawlerLoop;userCrawlerLoop|]
 [<EntryPoint>]
 let main argv  = 
