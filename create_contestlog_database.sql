@@ -193,7 +193,11 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `contest_log`.`user` (
   `iduser` INT NOT NULL AUTO_INCREMENT,
+  `userEmail` VARCHAR(256) NOT NULL,
+  `userLogin` VARCHAR(256) NOT NULL,
   PRIMARY KEY (`iduser`),
+  UNIQUE INDEX `userEmail_UNIQUE` (`userEmail` ) ,
+  UNIQUE INDEX `userLogin_UNIQUE` (`userLogin` ) )
 ENGINE = InnoDB;
 
 
@@ -332,18 +336,30 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `contest_log`.`user_github`
+-- Table `contest_log`.`display_name`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `contest_log`.`user_github` (
+CREATE TABLE IF NOT EXISTS `contest_log`.`display_name` (
   `user_iduser` INT NOT NULL,
-  `login` VARCHAR(256) NOT NULL,
-  `email` VARCHAR(256) NOT NULL,
+  `displayName` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`user_iduser`),
-  UNIQUE INDEX `login_UNIQUE` (`login` ) ,
-  UNIQUE INDEX `email_UNIQUE` (`email` ) ,
-  CONSTRAINT `fk_user_github_user1`
+  CONSTRAINT `fk_display_name_user1`
     FOREIGN KEY (`user_iduser`)
     REFERENCES `contest_log`.`user` (`iduser`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `contest_log`.`virtual_contest_name`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `contest_log`.`virtual_contest_name` (
+  `virtual_contest_idvirtual_contest` INT NOT NULL,
+  `virtualContestName` VARCHAR(256) NOT NULL,
+  PRIMARY KEY (`virtual_contest_idvirtual_contest`),
+  CONSTRAINT `fk_virtual_contest_name_virtual_contest1`
+    FOREIGN KEY (`virtual_contest_idvirtual_contest`)
+    REFERENCES `contest_log`.`virtual_contest` (`idvirtual_contest`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
