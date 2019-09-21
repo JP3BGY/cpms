@@ -52,13 +52,11 @@ type SetContestUser =
         contestServer:string
         contestUserId:string
     }
-[<CLIMutable>]
 type CreateVirtualContest = 
     {
         problems:int[]
         duration:Int64
     }
-[<CLIMutable>]
 type ProblemAndSubmission = 
     {
         problems:Problem[]
