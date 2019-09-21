@@ -290,7 +290,7 @@ let userCodeforces () =
                                  submission?creationTimeSeconds.AsInteger64(),
                                  (convertVerdict2SubmissionStatus (submission?verdict.AsString())),
                                  submission?id.AsInteger64()))
-                |>Array.filter(fun (_,_,_,ss,_)->(ss=SubmissionStatus.WJ)||(ss=SubmissionStatus.IG))
+                |>Array.filter(fun (_,_,_,ss,_)->(ss<>SubmissionStatus.WJ)&&(ss<>SubmissionStatus.IG))
         (handle,ret)
     let insertUserSubmissions (handle,submissions) =
         let ctx=getDataContext()
@@ -313,17 +313,23 @@ let userCodeforces () =
                     select problem.ProblemId
                     exactlyOne
             }
-            let isNotInDb = 
+            let inDb = 
                 query{
                     for submission in ctx.ContestLog.ProblemSubmissions do
                         where (submission.ContestServerSubmissonId = submissionId && submission.ContestUsersUserId=userDbId && submission.ProblemProblemId=problemDbId)
-                }|>Seq.isEmpty
-            if isNotInDb then 
+                }
+            if Seq.isEmpty inDb then 
                 ctx.ContestLog.ProblemSubmissions.``Create(contestServerSubmissonId, contest_users_userId, problem_problemId, submission_status, submission_time)`` (submissionId,userDbId,problemDbId,submissionStatusToString ss,creationTime)
                 |>ignore
                 ctx.SubmitUpdates()
                 ()
-                else ()
+            else 
+                let head = Seq.head inDb
+                if head.SubmissionStatus = (submissionStatusToString ss) then
+                    ()
+                else 
+                    head.SubmissionStatus <- submissionStatusToString ss
+                    ()
         submissions|>Array.map(insertUserSubmission)|>ignore
         ()
             
@@ -333,8 +339,9 @@ let userCodeforces () =
         query{
             for watchingUser in ctx.ContestLog.WatchingUser do
                 for user in ctx.ContestLog.ContestUsers do
-                    where (user.UserId = watchingUser.ContestUsersUserId)
-                    select user.ContestUserId
+                    for server in ctx.ContestLog.ContestServer do
+                        where (user.UserId = watchingUser.ContestUsersUserId&&user.ContestServerContestServerId = server.ContestServerId && server.ContestServerName = "Codeforces")
+                        select user.ContestUserId
         }|>Seq.toList
     handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
     eprintfn "userCodeforces ends"

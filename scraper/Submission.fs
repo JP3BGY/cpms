@@ -1,16 +1,16 @@
 module Scraper.Submission
 type SubmissionStatus = 
-    |AC 
-    |PE 
-    |PAC  
-    |RE  
-    |TLE  
-    |MLE  
-    |WA 
-    |CE  
-    |WJ  
-    |IG  
-    |NaN
+    |AC = 0
+    |PE = 1
+    |PAC = 2
+    |WA = 3
+    |RE = 4 
+    |TLE = 5 
+    |MLE = 6 
+    |CE = 7 
+    |WJ = 8 
+    |IG = 9 
+    |NaN = 10
 
 let submissionStatusDescription ss =
     match ss with
@@ -37,7 +37,7 @@ let submissionStatusToString ss =
     |SubmissionStatus.PE -> "PE"
     |SubmissionStatus.WJ -> "WJ"
     |SubmissionStatus.IG -> "IG"
-    |SubmissionStatus.NaN -> ""
+    |_-> ""
 let statusToSubmissionStatus ss =
     match ss with
     |"AC" ->
