@@ -3,6 +3,7 @@ open System
 open System.Web
 open System.Text
 open ContestServer.Setting
+open ContestServer.Types
 open Microsoft.AspNetCore.Mvc
 open FSharp.Data
 type UserDb = 
@@ -10,17 +11,6 @@ type UserDb =
         Iduser:Int32
         UserEmail:string
         UserLogin:string
-    }
-type UserContestId =
-    {
-        id:string
-        contestServerName:string
-    }
-type UserInfo = 
-    {
-        dbId:Int32
-        userName:string
-        userContestIds:UserContestId[]
     }
 let getUserInfo user = 
     let ctx = getDataContext()

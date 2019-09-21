@@ -1,14 +1,7 @@
 module ContestServer.Database2Data.Contest
 open System
 open ContestServer.Setting
-type Contest =
-    {
-        dbId:Int32
-        name:string
-        startUnixTime:Int64
-        url:string
-        contestServer:string
-    }
+open ContestServer.Types
 let contest2Url serverName serverContestId =
     match serverName with
     | "Codeforces" -> Ok ("https://codeforces.com/contest/"+serverContestId)

@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="Setting.fs" />
+    <Compile Include="Database2Data/Types.fs" />
     <Compile Include="Database2Data/UserInfo.fs" />
     <Compile Include="Database2Data/Contest.fs" />
     <Compile Include="Database2Data/Problem.fs" />
