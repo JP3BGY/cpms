@@ -1,6 +1,7 @@
 module ContestServer.Database2Data.Problem
 open System
 open ContestServer.Setting
+open ContestServer.Types
 open Scraper.Submission
 
 type ProblemDb =
@@ -17,24 +18,6 @@ type SubmissionDb =
         SubmissionTime:Int64
         SubmissionStatus:string
         ContestServerSubmissionId:Int64
-    }
-type Submission = 
-    {
-        problemId:Int32
-        userId:Int32
-        submissionTime:Int64
-        submissionStatus:string
-        url:string
-    }
-type Problem = 
-    {
-        dbId:Int32
-        name:string
-        tags:string []
-        url:string
-        serverName:string
-        difficulty:Nullable<Double>
-        contestDbId:Int32
     }
 let problem2Url serverName contestId problemId = 
     match serverName with
