@@ -6,6 +6,8 @@ open ContestServer.Database2Data.Problem
 open ContestServer.Setting
 open ContestServer.Database2Data.UserInfo
 open FSharp.Data.Sql
+open ContestServer.Types
+
 type Difficulty =
     | Easy = 0
     | EasyMiddle = 1

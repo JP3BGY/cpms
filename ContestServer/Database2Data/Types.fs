@@ -37,3 +37,30 @@ type UserInfo =
         userName:string
         userContestIds:UserContestId[]
     }
+type ErrorStatus =
+    {
+        code:Int16
+        result:string
+        url:string
+    }
+
+
+//Input Type
+
+type SetContestUser = 
+    {
+        contestServer:string
+        contestUserId:string
+    }
+[<CLIMutable>]
+type CreateVirtualContest = 
+    {
+        problems:int[]
+        duration:Int64
+    }
+[<CLIMutable>]
+type ProblemAndSubmission = 
+    {
+        problems:Problem[]
+        submissions:Submission[]
+    }

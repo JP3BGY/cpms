@@ -10,13 +10,8 @@ open Microsoft.AspNetCore.Authorization
 open ContestServer.Setting
 open ContestServer.VirtualContest
 open ContestServer.Database2Data.UserInfo
+open ContestServer.Types
 open FSharp.Data
-[<CLIMutable>]
-type SetContestUser = 
-    {
-        contestServer:string
-        contestUserId:string
-    }
 [<Route("api/[controller]")>]
 [<ApiController>]
 [<Authorize(Policy = "UserOnly")>]

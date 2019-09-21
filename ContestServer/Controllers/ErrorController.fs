@@ -6,13 +6,7 @@ open System.Linq
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Authorization
-[<CLIMutable>]
-type ErrorStatus =
-    {
-        code:Int16
-        result:string
-        url:string
-    }
+open ContestServer.Types
 
 [<Route("api/[controller]")>]
 [<ApiController>]

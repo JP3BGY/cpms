@@ -10,20 +10,9 @@ open Microsoft.AspNetCore.Authorization
 open ContestServer.Setting
 open ContestServer.VirtualContest
 open ContestServer.Database2Data.UserInfo
+open ContestServer.Types
 open ContestServer.Database2Data.Problem
 open FSharp.Data
-[<CLIMutable>]
-type CreateVirtualContest = 
-    {
-        problems:int[]
-        duration:Int64
-    }
-[<CLIMutable>]
-type ProblemAndSubmission = 
-    {
-        problems:Problem[]
-        submissions:Submission[]
-    }
 [<Route("api/[controller]")>]
 [<ApiController>]
 [<Authorize(Policy = "UserOnly")>]
