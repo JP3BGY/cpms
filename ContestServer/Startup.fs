@@ -1,6 +1,7 @@
 namespace ContestServer
 
 open System
+open System.IO
 open System.Text
 open System.Transactions
 open System.Collections.Generic
@@ -32,6 +33,11 @@ type Orgs = JsonProvider<"../data/github_orgs.json">
 type Teams = JsonProvider<"../data/github_teams.json">
 type Oauth2User = JsonProvider<"../data/github_user.json">
 type Emails = JsonProvider<"../data/github_emails.json">
+type Router =
+    {
+        controller:string
+        action:string
+    }
 type Startup private () =
     new (configuration: IConfiguration) as this =
         Startup() then
@@ -170,9 +176,14 @@ type Startup private () =
         else
             // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
             app.UseHsts() |> ignore
-
+        app.UseStaticFiles() |> ignore
         app.UseHttpsRedirection() |> ignore
         app.UseAuthentication() |> ignore
-        app.UseMvc() |> ignore
+        app.UseMvc(
+            fun routes ->
+                routes.MapRoute("spa","{*spa}",
+                                {controller = "Spa";action ="Get"})|>ignore
+                ()
+        ) |> ignore
 
     member val Configuration : IConfiguration = null with get, set

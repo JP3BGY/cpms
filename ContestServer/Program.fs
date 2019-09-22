@@ -20,9 +20,12 @@ module Program =
     let exitCode = 0
 
     let CreateWebHostBuilder args =
+        let webRoot = Path.Combine(Directory.GetCurrentDirectory(),"..","frontend","build")
+        eprintfn "web root is %s" webRoot
         WebHost
             .CreateDefaultBuilder(args)
-            .UseStartup<Startup>();
+            .UseStartup<Startup>()
+            .UseWebRoot(webRoot);
 
     [<EntryPoint>]
     let main args =
