@@ -13,6 +13,7 @@
     <Compile Include="Database2Data/Problem.fs" />
     <Compile Include="VirtualContest/VirtualContest.fs" />
     <Compile Include="Controllers/ErrorController.fs" />
+    <Compile Include="Controllers/AccountController.fs" />
     <Compile Include="Controllers/ContestController.fs" />
     <Compile Include="Controllers/VirtualContestController.fs" />
     <Compile Include="Controllers/UserController.fs" />
