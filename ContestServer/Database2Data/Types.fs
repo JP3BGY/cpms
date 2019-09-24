@@ -43,6 +43,11 @@ type ErrorStatus =
         result:string
         url:string
     }
+type ProblemAndSubmission = 
+    {
+        problems:Problem[]
+        submissions:Submission[]
+    }
 
 
 //Input Type
@@ -56,9 +61,4 @@ type CreateVirtualContest =
     {
         problems:int[]
         duration:Int64
-    }
-type ProblemAndSubmission = 
-    {
-        problems:Problem[]
-        submissions:Submission[]
     }
