@@ -7,6 +7,7 @@ open System.Linq
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Authorization
+open Microsoft.Extensions.Logging
 open ContestServer.Setting
 open ContestServer.VirtualContest
 open ContestServer.Database2Data.UserInfo
@@ -15,14 +16,14 @@ open FSharp.Data
 [<Route("api/[controller]")>]
 [<ApiController>]
 [<Authorize(Policy = "UserOnly")>]
-type UserController () =
+type UserController (logger : ILogger<UserController>) =
     inherit ControllerBase()
     [<HttpPost("addcontestuser")>]
-    member this.AddContestUser([<FromBody>] (contestUser:SetContestUser)) =
-        let userInfo = getUserInfoFromControllerBase (this:>ControllerBase)
+    member __.AddContestUser([<FromBody>] (contestUser:SetContestUser)) =
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
         let res=setContestUser userInfo (contestUser.contestServer) (contestUser.contestUserId)
         match res  with
-        | Ok _ -> this.Ok():>ActionResult
+        | Ok _ -> __.Ok():>ActionResult
         | Error err ->
             let res =
                 {
@@ -30,4 +31,4 @@ type UserController () =
                     result = err
                     url = null
                 }
-            this.StatusCode(500,res):>ActionResult
+            __.StatusCode(500,res):>ActionResult

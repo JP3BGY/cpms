@@ -6,28 +6,28 @@ open System.Linq
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Authentication
-open Microsoft.AspNetCore.Authentication.JwtBearer
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Authentication.OAuth
 open Microsoft.AspNetCore.Authorization
+open Microsoft.Extensions.Logging
 open ContestServer.Setting
 open ContestServer.Database2Data.Contest
 [<Route("/[controller]")>]
 [<ApiController>]
-type AccountController () =
+type AccountController (logger : ILogger<AccountController>) =
     inherit ControllerBase()
 
     [<HttpGet("login")>]
-    member this.Login() =
+    member __.Login() =
         let authProp = AuthenticationProperties()
-        authProp.RedirectUri<-this.Url.Content("~/")
+        authProp.RedirectUri<-__.Url.Content("~/")
         base.Challenge(authProp,"GitHub")
     [<HttpPost("login")>]
-    member this.LoginWithRedirect([<FromBody>]redirectUrl:string) =
+    member __.LoginWithRedirect([<FromBody>]redirectUrl:string) =
         eprintfn "redirect Url %s" redirectUrl
         let authProp = AuthenticationProperties()
-        authProp.RedirectUri<-this.Url.Content(redirectUrl)
+        authProp.RedirectUri<-__.Url.Content(redirectUrl)
         base.Challenge(authProp,"GitHub")
     [<HttpPost("logout")>]
-    member this.Logout() =
+    member __.Logout() =
         base.SignOut(CookieAuthenticationDefaults.AuthenticationScheme)

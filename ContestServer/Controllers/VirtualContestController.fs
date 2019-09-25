@@ -5,6 +5,7 @@ open System.Transactions
 open System.Collections.Generic
 open System.Linq
 open System.Threading.Tasks
+open Microsoft.Extensions.Logging
 open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Authorization
 open ContestServer.Setting
@@ -16,15 +17,15 @@ open FSharp.Data
 [<Route("api/[controller]")>]
 [<ApiController>]
 [<Authorize(Policy = "UserOnly")>]
-type VirtualContestController () =
+type VirtualContestController (logger : ILogger<VirtualContestController>) =
     inherit ControllerBase()
     [<HttpGet>]
-    member this.GetVirtualContests() =
+    member __.GetVirtualContests() =
         let elms = getVirtualContests ()
         base.Ok(elms)
     [<HttpGet("problems/{id}")>]
-    member this.GetProblems(id) =
-        let res = getProblemsOfVirtualContest id (getUserInfoFromControllerBase (this:>ControllerBase))
+    member __.GetProblems(id) =
+        let res = getProblemsOfVirtualContest id (getUserInfoFromControllerBase (__:>ControllerBase))
         match res with
         | Ok (probs,subs)->
             base.Ok({
@@ -38,7 +39,7 @@ type VirtualContestController () =
                     result = err
                     url = null
                 }
-            this.StatusCode(500,res):>ActionResult
+            __.StatusCode(500,res):>ActionResult
 
     [<HttpPost("create")>]
     member this.Post([<FromBody>] setting) =

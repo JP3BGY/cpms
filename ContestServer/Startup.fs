@@ -1,30 +1,25 @@
 namespace ContestServer
 
 open System
-open System.IO
-open System.Text
+open System.Text.Json
 open System.Transactions
+open System.Security.Claims
+open System.Net.Http
+open System.Net.Http.Headers
 open System.Collections.Generic
 open System.Linq
 open System.Threading.Tasks
-open System.Net.Http
-open System.Net.Http.Headers
-open System.Security.Claims
-open System.Threading.Tasks
-open Microsoft.AspNetCore.Authentication
-open Microsoft.AspNetCore.Authentication.JwtBearer
-open Microsoft.AspNetCore.Authentication.Cookies
-open Microsoft.AspNetCore.Authentication.OAuth
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.HttpsPolicy
+open Microsoft.AspNetCore.HttpsPolicy;
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Authentication
+open Microsoft.AspNetCore.Authentication.Cookies
+open Microsoft.AspNetCore.Authentication.OAuth
 open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Options
-open Microsoft.IdentityModel.Tokens
-open Newtonsoft.Json.Linq
+open Microsoft.Extensions.Hosting
 open FSharp.Data
 
 open ContestServer.Setting
@@ -33,11 +28,6 @@ type Orgs = JsonProvider<"../data/github_orgs.json">
 type Teams = JsonProvider<"../data/github_teams.json">
 type Oauth2User = JsonProvider<"../data/github_user.json">
 type Emails = JsonProvider<"../data/github_emails.json">
-type Router =
-    {
-        controller:string
-        action:string
-    }
 type Startup private () =
     new (configuration: IConfiguration) as this =
         Startup() then
@@ -52,13 +42,13 @@ type Startup private () =
                 ())
             .AddCookie(
                 fun options ->
-                    options.Cookie.Name <- "github.auth"
+                    options.Cookie.Name<-"github.auth"
                     options.Cookie.SecurePolicy <- CookieSecurePolicy.Always
                     options.AccessDeniedPath <- PathString("/api/Error/AccessDenied")
                     ()
             )
             .AddOAuth("GitHub",
-                fun (options:OAuthOptions) -> 
+                fun (options:OAuthOptions) ->
                     options.ClientId <- this.Configuration.["GitHub:ClientId"]
                     options.ClientSecret <- this.Configuration.["GitHub:ClientSecret"]
                     options.Scope.Add("read:org user:email")
@@ -66,11 +56,11 @@ type Startup private () =
                     options.AuthorizationEndpoint <- "https://github.com/login/oauth/authorize"
                     options.TokenEndpoint <- "https://github.com/login/oauth/access_token"
                     options.UserInformationEndpoint <- "https://api.github.com/user"
-                    
-                    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id")
-                    options.ClaimActions.MapJsonKey(ClaimTypes.Name, "name")
-                    options.ClaimActions.MapJsonKey("github:login", "login")
-                    options.Events <- OAuthEvents 
+
+                    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier,"id")
+                    options.ClaimActions.MapJsonKey(ClaimTypes.Name,"name")
+                    options.ClaimActions.MapJsonKey("github:login","login")
+                    options.Events <- OAuthEvents
                         (
                             OnCreatingTicket = fun context ->
                                 async{
@@ -86,8 +76,8 @@ type Startup private () =
                                         raw
                                     let userRaw = httpGetWithToken context.Options.UserInformationEndpoint
                                     eprintfn "user: %s" userRaw
-                                    let user = JObject.Parse(userRaw)
-                                    context.RunClaimActions(user)
+                                    let user = JsonDocument.Parse(userRaw)
+                                    context.RunClaimActions(user.RootElement)
                                     let userJson = Oauth2User.Parse(userRaw)
                                     let emailsRaw = httpGetWithToken "https://api.github.com/user/emails"
                                     let emailJson = Emails.Parse(emailsRaw)
@@ -167,23 +157,23 @@ type Startup private () =
                         ())
                 ()
         )|>ignore
-        services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2) |> ignore
+        services.AddControllers() |> ignore
 
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-    member this.Configure(app: IApplicationBuilder, env: IHostingEnvironment) =
+    member this.Configure(app: IApplicationBuilder, env: IWebHostEnvironment) =
         if (env.IsDevelopment()) then
             app.UseDeveloperExceptionPage() |> ignore
-        else
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-            app.UseHsts() |> ignore
-        app.UseStaticFiles() |> ignore
+        
         app.UseHttpsRedirection() |> ignore
+        app.UseStaticFiles() |> ignore
+        app.UseRouting() |> ignore
+
         app.UseAuthentication() |> ignore
-        app.UseMvc(
-            fun routes ->
-                routes.MapRoute("spa","{*spa}",
-                                {controller = "Spa";action ="Get"})|>ignore
-                ()
-        ) |> ignore
+        app.UseAuthorization() |> ignore
+
+        app.UseEndpoints(fun endpoints ->
+            endpoints.MapControllerRoute("client","/{*path}",{|controller="Spa";action="Get"|}) |> ignore
+            endpoints.MapControllers() |> ignore
+            ) |> ignore
 
     member val Configuration : IConfiguration = null with get, set
