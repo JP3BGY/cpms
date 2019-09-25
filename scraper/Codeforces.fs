@@ -180,6 +180,60 @@ let rec codeforces ()=
                     where ((contest.ContestServerContestId = contestId) && (contest.ContestServerContestServerId = contestServerId))
             }
         not (Seq.isEmpty elm)
+
+    let addDifficulty () =
+        let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+        try
+            use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
+                                                   transactionopt,
+                                                   TransactionScopeAsyncFlowOption.Enabled)
+            eprintfn "Start addDifficulty"
+            let ctx = getDataContext()
+            eprintfn "Get Elms"
+            let elms = 
+                query{
+                    for problem in ctx.ContestLog.Problem do
+                        join contest in ctx.ContestLog.Contest on (problem.ContestContestId = contest.ContestId)
+                        where (not (query{
+                            for diff in ctx.ContestLog.ProblemDifficulty do
+                                select diff.ProblemProblemId
+                                contains problem.ProblemId
+                        }))
+                        select (contest.ContestId,contest.ContestServerContestId)
+                }|>Set.ofSeq
+            eprintfn "map elms %d" (elms.Count)
+            elms|>Set.map(
+                fun (dbId,contestId)->
+                    eprintfn "add Difficulty of %s" contestId
+                    let contestRes = Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString()+"&from=1&count=1")
+                    eprintfn "%s" contestRes
+                    let problems = JsonValue.Parse(contestRes)?result?problems.AsArray()
+                    problems|>
+                        Array.map(
+                            fun problem->
+                                match problem.TryGetProperty("rating") with
+                                | None -> ()
+                                | Some(x) -> 
+                                    eprintfn "Difficulty %f" (x.AsFloat())
+                                    let elm = 
+                                        query{
+                                            for p in ctx.ContestLog.Problem do
+                                                where (p.ContestContestId = dbId && p.ContestServerProblemId = (problem?index.AsString()))
+                                                select (p.ProblemId)
+                                                exactlyOne
+                                        }
+                                    ctx.ContestLog.ProblemDifficulty.``Create(problemDifficulty, problem_problemId)``(x.AsFloat(),elm)|>ignore
+                                    ctx.SubmitUpdates()
+                        )|>ignore
+                )|>ignore
+            ctx.SubmitUpdates()
+            transaction.Complete()
+            eprintfn "All complete"
+        with
+        | :? TransactionAbortedException as te ->
+            eprintfn "Transaction Error in addDifficulty %s" te.Message
+            GC.Collect()
+            ()
     async{
         try
             let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
@@ -218,6 +272,7 @@ let rec codeforces ()=
                        )|>ignore
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
                        |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
+            addDifficulty()
             eprintfn "Update Done"
             cfDeleteAllCache()|>ignore
             eprintfn "Delete all cache"
