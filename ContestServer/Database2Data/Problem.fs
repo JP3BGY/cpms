@@ -86,6 +86,21 @@ let getProblems () =
     |>Seq.map(
             problemDb2Problem
     )
+let getLimitProblems offset n =
+    let ctx = getDataContext()
+    query{
+        for problem in ctx.ContestLog.Problem do
+            join contest in ctx.ContestLog.Contest on (problem.ContestContestId = contest.ContestId)
+            sortByDescending contest.ContestStartTime
+            thenBy problem.ContestServerProblemId
+            skip offset
+            take n
+            select problem
+    }|>Seq.map(fun x->x.MapTo<ProblemDb>())
+    |>Seq.map(
+            problemDb2Problem
+    )
+
 let getProblemsOfContest contestId =
     let ctx = getDataContext()
     query{
