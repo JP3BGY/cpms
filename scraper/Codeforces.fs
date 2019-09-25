@@ -200,9 +200,10 @@ let rec codeforces ()=
                                 contains problem.ProblemId
                         }))
                         select (contest.ContestId,contest.ContestServerContestId)
-                }|>Set.ofSeq
-            eprintfn "map elms %d" (elms.Count)
-            elms|>Set.map(
+                        distinct
+                }|>Seq.toArray
+            eprintfn "map elms %d" (elms.Length)
+            elms|>Array.map(
                 fun (dbId,contestId)->
                     eprintfn "add Difficulty of %s" contestId
                     let contestRes = Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString()+"&from=1&count=1")
