@@ -22,7 +22,7 @@ class Problem extends React.Component<{},{isAwait:Boolean,err:Api.Status,problem
                 problems:state.problems,
                 isAwait:true,
             }))
-        Api.apiCall(0, "/api/problem")
+        Api.apiCall(0, "/api/problem?offset=0&n=100")
             .then(res => {
                 this.setState(state=>({
                     isAwait:false,
