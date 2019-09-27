@@ -7,6 +7,7 @@
     <Compile Include="Setting.fs" />
     <Compile Include="Submission.fs" />
     <Compile Include="Codeforces.fs" />
+    <Compile Include="AtCoder.fs" />
     <Compile Include="Crawlers.fs" />
     <Compile Include="UserCrawlers.fs" />
     <Compile Include="Program.fs" />

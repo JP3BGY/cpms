@@ -8,9 +8,7 @@ let userCrawlerArray=
         userCodeforces;
     |]
 let rec internalUserCrawlerLoop () =
-    userCrawlerArray|>Array.map(fun x -> x())|>ignore
-    Thread.Sleep(TimeSpan.FromMinutes(5.0))
-    internalUserCrawlerLoop()
+    userCrawlerArray|>Array.map(fun x-> x())|>Async.Parallel|>Async.RunSynchronously|>ignore
 let userCrawlerLoop =
     async{
         internalUserCrawlerLoop()

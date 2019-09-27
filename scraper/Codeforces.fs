@@ -9,6 +9,9 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open FSharp.Data.Runtime.Caching
 open MySql.Data
+let rand = Random()
+let webSleep() = 
+    Threading.Thread.Sleep (TimeSpan.FromSeconds(1.0+rand.NextDouble()*5.0))
 let cfCachePrefix = "codeforces"
 let codeforcesCache = createInternetFileCache (Path.Combine(gCachePrefix,cfCachePrefix)) (TimeSpan.MaxValue)
 let cfDeleteAllCache () =
@@ -24,7 +27,6 @@ let cfDeleteAllCache () =
         di.Delete()
     ()
 let rec codeforces ()=
-    eprintfn "Codeforces crawler start!" |> ignore
     let contestServerId=
         let ctx=getDataContext()
         query{
@@ -57,6 +59,7 @@ let rec codeforces ()=
                                 match codeforcesCache.TryRetrieve(handle) with
                                 | None -> 
                                     let c = Http.RequestString("https://codeforces.com/api/user.rating?handle="+handle)
+                                    webSleep()
                                     codeforcesCache.Set (handle,c)
                                     ()
                                 | Some(x) ->
@@ -68,6 +71,7 @@ let rec codeforces ()=
                 let ratingChanges = match codeforcesCache.TryRetrieve(handle) with
                                     | None -> 
                                             let c = Http.RequestString("https://codeforces.com/api/user.rating?handle="+handle)
+                                            webSleep()
                                             codeforcesCache.Set (handle, c)
                                             JsonValue.Parse(c)?result.AsArray()
                                     | Some(x) -> JsonValue.Parse(x)?result.AsArray()
@@ -114,8 +118,10 @@ let rec codeforces ()=
             eprintfn "contest %d" contestId
             let prDict =  
                 let participantsRating=Http.RequestString("https://codeforces.com/api/contest.ratingChanges?contestId="+contestId.ToString(),silentHttpErrors=true)|>JsonValue.Parse
+                webSleep()
                 if participantsRating?status.AsString() = "OK" then participantsRatingDict (participantsRating?result.AsArray()) else Map.empty
             let  problemsAndParticipants =Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString())|>JsonValue.Parse
+            webSleep()
             (extractUsers (problemsAndParticipants?result?rows.AsArray()))
                 |>fun x ->makeParticipantsRatingCache x prDict|>ignore
             let contestTime = problemsAndParticipants?result?contest?startTimeSeconds.AsInteger64()
@@ -207,6 +213,7 @@ let rec codeforces ()=
                 fun (dbId,contestId)->
                     eprintfn "add Difficulty of %s" contestId
                     let contestRes = Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString()+"&from=1&count=1")
+                    webSleep()
                     eprintfn "%s" contestRes
                     let problems = JsonValue.Parse(contestRes)?result?problems.AsArray()
                     problems|>
@@ -236,8 +243,10 @@ let rec codeforces ()=
             GC.Collect()
             ()
     async{
+        eprintfn "Codeforces crawler start!" |> ignore
         try
             let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
+            webSleep()
             let  contestsArr=JsonValue.Parse(contestsRes)?result.AsArray()
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() <> "FINISHED")
                        |>Array.filter(fun contestJson ->
@@ -304,8 +313,7 @@ let rec codeforces ()=
             codeforces()|>Async.RunSynchronously|>ignore
     }
 
-let userCodeforces () =
-    eprintfn "userCodeforces Start!"
+let rec userCodeforces () =
     let contestServerDbId=
         let ctx=getDataContext()
         query{
@@ -336,8 +344,8 @@ let userCodeforces () =
             eprintfn "convertVerdict2SubmissionStatus %s" x
             SubmissionStatus.IG
     let getUserSubmissions handle =
-        let submissions=Http.RequestString("https://codeforces.com/api/user.status?handle="+handle)
-                            |>JsonValue.Parse
+        let submissions=Http.RequestString("https://codeforces.com/api/user.status?handle="+handle)|>JsonValue.Parse
+        webSleep()
         let ret=
             submissions?result.AsArray()
                 |>Array.map(fun submission ->
@@ -389,16 +397,21 @@ let userCodeforces () =
         submissions|>Array.map(insertUserSubmission)|>ignore
         ()
             
-        
-    let ctx = getDataContext()
-    let handles = 
-        query{
-            for watchingUser in ctx.ContestLog.WatchingUser do
-                for user in ctx.ContestLog.ContestUsers do
-                    for server in ctx.ContestLog.ContestServer do
-                        where (user.UserId = watchingUser.ContestUsersUserId&&user.ContestServerContestServerId = server.ContestServerId && server.ContestServerName = "Codeforces")
-                        select user.ContestUserId
-        }|>Seq.toList
-    handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
-    eprintfn "userCodeforces ends"
-    ()
+    async{
+        eprintfn "userCodeforces Start!"
+        let ctx = getDataContext()
+        let handles = 
+            query{
+                for watchingUser in ctx.ContestLog.WatchingUser do
+                    for user in ctx.ContestLog.ContestUsers do
+                        for server in ctx.ContestLog.ContestServer do
+                            where (user.UserId = watchingUser.ContestUsersUserId&&user.ContestServerContestServerId = server.ContestServerId && server.ContestServerName = "Codeforces")
+                            select user.ContestUserId
+            }|>Seq.toList
+        handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
+        eprintfn "userCodeforces ends"
+        let nextCrawleTime = TimeSpan.FromMinutes(1.0)
+        Console.WriteLine ("SleepTime {0}",nextCrawleTime)
+        Threading.Thread.Sleep(nextCrawleTime)
+        codeforces()|>Async.RunSynchronously|>ignore
+    }
