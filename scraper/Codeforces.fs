@@ -113,7 +113,7 @@ let rec codeforces ()=
         ()
 
     let insertContestAndProblemsAndParticipants contestId =
-        let transactionopt = new TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+        let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
         try
             eprintfn "contest %d" contestId
             let prDict =  
@@ -200,11 +200,11 @@ let rec codeforces ()=
                 query{
                     for problem in ctx.ContestLog.Problem do
                         join contest in ctx.ContestLog.Contest on (problem.ContestContestId = contest.ContestId)
-                        where (not (query{
+                        where (contest.ContestServerContestServerId = contestServerId && (not (query{
                             for diff in ctx.ContestLog.ProblemDifficulty do
                                 select diff.ProblemProblemId
                                 contains problem.ProblemId
-                        }))
+                        })))
                         select (contest.ContestId,contest.ContestServerContestId)
                         distinct
                 }|>Seq.toArray
