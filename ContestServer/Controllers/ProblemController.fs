@@ -18,7 +18,7 @@ type ProblemController (logger : ILogger<ProblemController>) =
 
     [<HttpGet>]
     member __.Get([<FromQuery>]offset,[<FromQuery>]n) =
-        if offset<0||n<0 then
+        if offset<0||n<0 || n>200 then
             base.BadRequest({
             code = 400s
             result = "offset and n must be positive integer"
@@ -26,7 +26,13 @@ type ProblemController (logger : ILogger<ProblemController>) =
             }):>ActionResult
         else 
             let elms = getLimitProblems offset n
-            base.Ok(elms):>ActionResult
+            let ctx = getDataContext()
+            let elmnum=
+                query{
+                    for problem in ctx.ContestLog.Problem do
+                        count
+                }
+            base.Ok({problems=elms|>Seq.toArray;elmNum=elmnum}):>ActionResult
     [<HttpGet("{contestId}")>]
     member __.Get(contestId:int) =
         let elms = getProblemsOfContest contestId

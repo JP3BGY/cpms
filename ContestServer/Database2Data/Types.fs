@@ -48,7 +48,11 @@ type ProblemAndSubmission =
         problems:Problem[]
         submissions:Submission[]
     }
-
+type ProblemResponse =
+    {
+        problems:Problem[]
+        elmNum:int
+    }
 
 //Input Type
 
