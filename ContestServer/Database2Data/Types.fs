@@ -56,13 +56,16 @@ type ProblemResponse =
 
 //Input Type
 
+[<CLIMutable>]
 type SetContestUser = 
     {
         contestServer:string
         contestUserId:string
     }
+[<CLIMutable>]
 type CreateVirtualContest = 
     {
         problems:int[]
+        startTime: int64
         duration:Int64
     }
