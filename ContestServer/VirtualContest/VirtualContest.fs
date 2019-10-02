@@ -112,17 +112,22 @@ let createContest (creatorInfo:UserInfo) startTime duration (problems:int[]) =
             Error "There is little time left."
         else
             let ctx = getDataContext()
-            let problemSet = Set.ofArray problems
+            let problemSet = ( Set.ofArray problems )
             let servers = 
                 query{
                     for problem in ctx.ContestLog.Problem do
                         for contest in ctx.ContestLog.Contest do
                             for contestServer in ctx.ContestLog.ContestServer do
-                                where (problemSet.Contains(problem.ProblemId) && problem.ContestContestId = contest.ContestId && contest.ContestServerContestServerId = contestServer.ContestServerId)
+                                where ( query{
+                                    for prob in problemSet do
+                                        contains(problem.ProblemId)
+                                }&& problem.ContestContestId = contest.ContestId && contest.ContestServerContestServerId = contestServer.ContestServerId)
                                 select (problem.ProblemId,contestServer.ContestServerId)
+                                distinct
                 }|> Array.ofSeq
             let isNotValid = 
-                problemSet.Count = servers.Length
+                (problemSet.Count <> servers.Length)
+            eprintfn "Problem length %d" (servers.Length)
             if isNotValid then
                 Error "No such problem is found."
             else

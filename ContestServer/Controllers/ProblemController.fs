@@ -17,15 +17,17 @@ type ProblemController (logger : ILogger<ProblemController>) =
     inherit ControllerBase()
 
     [<HttpGet>]
-    member __.Get([<FromQuery>]offset,[<FromQuery>]n) =
+    member __.Get([<FromQuery>]offset,[<FromQuery>]n,[<FromQuery>]search) =
+        eprintfn "search %s" search
         if offset<0||n<0 || n>200 then
             base.BadRequest({
             code = 400s
-            result = "offset and n must be positive integer"
+            result = "offset and n must be positive integer and smaller than 201"
             url = null
             }):>ActionResult
         else 
-            let elms = getLimitProblems offset n
+            let elms = 
+                getLimitProblems offset n 
             let ctx = getDataContext()
             let elmnum=
                 query{

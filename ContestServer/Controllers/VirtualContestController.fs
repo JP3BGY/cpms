@@ -45,8 +45,9 @@ type VirtualContestController (logger : ILogger<VirtualContestController>) =
     member this.Post([<FromBody>] setting) =
         let duration = setting.duration
         let problemIds = setting.problems
+        let startTime = setting.startTime
         let userInfo = getUserInfoFromControllerBase (this:>ControllerBase)
-        let result = createContestNow userInfo duration problemIds
+        let result = createContest userInfo startTime duration problemIds
         match result with
         | Ok x -> this.Ok(x):>ActionResult
         | Error err -> 
