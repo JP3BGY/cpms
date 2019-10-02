@@ -58,6 +58,7 @@ export interface SetContestUser
 export interface CreateVirtualContest 
     {
         problems:number[]
+        startTime:number
         duration:number
     }
 export enum Status {
