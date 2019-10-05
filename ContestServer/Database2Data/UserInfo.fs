@@ -83,8 +83,45 @@ let findAndCreateContestUser serverName contestUserId =
             Error()
     | _ -> Error()
 
-        
-let setContestUser userInfo serverName contestUserId =
+let delContestUser (userInfo:UserInfo) serverName contestUserId =
+    let ctx = getDataContext()
+    let server = 
+        try
+            Ok(query{
+                for server in ctx.ContestLog.ContestServer do
+                    where (server.ContestServerName = serverName)
+                    select server.ContestServerId
+                    exactlyOne
+            })
+        with
+        | :? SystemException as se ->
+            Error()
+    match server with
+    | Ok x ->
+        let elms = 
+            query{
+                for wuser in ctx.ContestLog.WatchingUser do
+                    join cuser in ctx.ContestLog.ContestUsers on (wuser.ContestUsersUserId = cuser.UserId)
+                    where (wuser.UserIduser = userInfo.dbId && cuser.ContestServerContestServerId = x && cuser.ContestUserId = contestUserId)
+                    select wuser
+            }
+        if Seq.isEmpty elms then 
+            Error("No such user found")
+        else
+            try
+                let elm = Seq.head elms
+                elm.Delete()
+                ctx.SubmitUpdates()
+                Ok()
+            with
+            | :? Exception as e->
+                eprintfn "%s" (e.Message)
+                Error("Internal error")
+    | Error x ->
+        Error("No such contest server found or supported")
+
+let setContestUser (userInfo:UserInfo) serverName contestUserId =
+    eprintfn "setContestUser %s %s" serverName contestUserId
     let ctx = getDataContext()
     let server = 
         try
