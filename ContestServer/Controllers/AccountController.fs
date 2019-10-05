@@ -18,9 +18,13 @@ type AccountController (logger : ILogger<AccountController>) =
     inherit ControllerBase()
 
     [<HttpGet("login")>]
-    member __.Login() =
+    member __.Login([<FromQuery>]rd:string) =
+        eprintfn "Login %s %s" rd (__.Url.Content("~/"))
         let authProp = AuthenticationProperties()
-        authProp.RedirectUri<-__.Url.Content("~/")
+        if __.Url.IsLocalUrl(rd) then 
+            authProp.RedirectUri<-rd
+        else 
+            authProp.RedirectUri<-__.Url.Content("~/")
         base.Challenge(authProp,"GitHub")
     [<HttpPost("login")>]
     member __.LoginWithRedirect([<FromBody>]redirectUrl:string) =

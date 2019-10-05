@@ -41,10 +41,21 @@ export interface ErrorStatus
         result:string
         url:string
     }
-export interface ProblemAndSubmission 
+export interface VContestDetails 
     {
+        vContest:VContest
         problems:Problem[]
         submissions:Submission[]
+        isCreator:boolean
+    }
+export interface VContest 
+    {
+        dbId:number
+        name:string
+        startTime:number
+        endTime:number
+        participants:UserInfo []
+        creator:UserInfo
     }
 
 
@@ -60,6 +71,7 @@ export interface CreateVirtualContest
         problems:number[]
         startTime:number
         duration:number
+        name:string
     }
 export enum Status {
     Ok,
@@ -83,11 +95,11 @@ export let apiCall = function (idx:number,url:string,body?:any){
         cache:"no-store",
     }).then((res)=>{
         if(res.status===401){
-            throw Status.Unauthorized;
+            window.location.href="/account/login?rd="+window.location.pathname
         }else if(res.status===403){
             throw Status.NotPermitted;
         }else if(res.status>=200&&res.status<300){
-            return res.json();
+            return res.text().then((text)=>(text?JSON.parse(text):{}));
         }else{
             throw Status.Error;
         }
