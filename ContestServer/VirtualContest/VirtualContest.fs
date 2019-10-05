@@ -16,10 +16,10 @@ type Difficulty =
     | Hard = 4
 type VContestDb = 
     {
-        IdvirtualContest:Int32
-        StartTime:Int64
-        EndTime:Int64
-        CreatedUserUserIduser:Int32
+        IdvirtualContest:int
+        StartTime:int64
+        EndTime:int64
+        CreatedUserUserIduser:int
     }
 let getVirtualContest vContestDb =
     let ctx = getDataContext()
@@ -70,8 +70,8 @@ let getProblemsOfVirtualContest dbId (userInfo:UserInfo) =
                             for wuser in ctx.ContestLog.WatchingUser do
                                 where (vParticipant.VirtualContestIdvirtualContest = dbId && vProblem.VirtualContestIdvirtualContest = dbId && wuser.UserIduser = vParticipant.UserIduser && submission.ContestUsersUserId = wuser.ContestUsersUserId && submission.ProblemProblemId = vProblem.ProblemProblemId)
                                 select (submission,wuser.UserIduser)
-            }|>Seq.map(fun (x,y)-> (x.MapTo<SubmissionDb>(),y))
-            |>Seq.map(fun (x,y)->submissionDb2SubmissionWithU x y)|>Seq.toArray
+            }
+            |>Seq.map(fun (x,y)->submissionDb2SubmissionWithU (x.MapTo<SubmissionDb>()) y)|>Seq.toArray
         Ok(Seq.head elm,problems,submissions)
 
 let getVirtualContests()=

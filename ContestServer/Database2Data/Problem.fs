@@ -6,18 +6,18 @@ open Scraper.Submission
 
 type ProblemDb =
     {
-        ProblemId:Int32
+        ProblemId:int
         ProblemName:string
         ContestServerProblemId:string
-        ContestContestId:Int32
+        ContestContestId:int
     }
 type SubmissionDb =
     {
-        ProblemProblemId:Int32
-        ContestUserUserId:Int32
-        SubmissionTime:Int64
+        ProblemProblemId:int
+        ContestUsersUserId:int
+        SubmissionTime:int64
         SubmissionStatus:string
-        ContestServerSubmissionId:Int64
+        ContestServerSubmissionId:int64
     }
 let problem2Url serverName contestId problemId = 
     match serverName with

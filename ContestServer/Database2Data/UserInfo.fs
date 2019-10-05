@@ -8,7 +8,7 @@ open Microsoft.AspNetCore.Mvc
 open FSharp.Data
 type UserDb = 
     {
-        Iduser:Int32
+        Iduser:int
         UserEmail:string
         UserLogin:string
     }

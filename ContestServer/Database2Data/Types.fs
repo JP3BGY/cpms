@@ -3,31 +3,31 @@ open System
 [<CLIMutable>]
 type Contest =
     {
-        dbId:Int32
+        dbId:int
         name:string
-        startUnixTime:Int64
+        startUnixTime:int64
         url:string
         contestServer:string
     }
 [<CLIMutable>]
 type Submission = 
     {
-        problemId:Int32
-        userId:Int32
-        submissionTime:Int64
+        problemId:int
+        userId:int
+        submissionTime:int64
         submissionStatus:string
         url:string
     }
 [<CLIMutable>]
 type Problem = 
     {
-        dbId:Int32
+        dbId:int
         name:string
         tags:string []
         url:string
         serverName:string
         difficulty:Nullable<Double>
-        contestDbId:Int32
+        contestDbId:int
     }
 [<CLIMutable>]
 type UserContestId =
@@ -38,14 +38,14 @@ type UserContestId =
 [<CLIMutable>]
 type UserInfo = 
     {
-        dbId:Int32
+        dbId:int
         userName:string
         userContestIds:UserContestId[]
     }
 [<CLIMutable>]
 type ErrorStatus =
     {
-        code:Int16
+        code:int16
         result:string
         url:string
     }
@@ -58,10 +58,10 @@ type ProblemResponse =
 [<CLIMutable>]
 type VContest =
     {
-        dbId:Int32
+        dbId:int
         name:string
-        startTime:Int64
-        endTime:Int64
+        startTime:int64
+        endTime:int64
         participants:UserInfo []
         creator:UserInfo
     }
@@ -87,6 +87,6 @@ type CreateVirtualContest =
     {
         problems:int[]
         startTime: int64
-        duration:Int64
+        duration:int64
         name:string
     }
