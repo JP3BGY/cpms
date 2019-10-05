@@ -249,16 +249,21 @@ let rec codeforces ()=
             webSleep()
             let  contestsArr=JsonValue.Parse(contestsRes)?result.AsArray()
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() <> "FINISHED")
-                       |>Array.filter(fun contestJson ->
-                                          let ctx = getDataContext()
-                                          let cnt = query{
-                                              for contestbe in ctx.ContestLog.ContestBeforeEnd do
-                                                where (contestbe.ContestServerContestId=contestJson?id.AsInteger().ToString()&&contestbe.ContestServerContestServerId=contestServerId)
-                                                count
-                                          }
-                                          cnt=0)
-                       |>Array.map(fun contestJson -> 
-                                        eprintfn "before end %s" (contestJson?name.AsString())
+                       |>Array.map(fun contestJson ->
+                                    let ctx = getDataContext()
+                                    let elm = 
+                                        try
+                                            Ok(query{
+                                                for contestbe in ctx.ContestLog.ContestBeforeEnd do
+                                                  where (contestbe.ContestServerContestId=contestJson?id.AsInteger().ToString()&&contestbe.ContestServerContestServerId=contestServerId)
+                                                  exactlyOne
+                                            })
+                                        with
+                                        | :? Exception as e->
+                                            Error()
+                                    eprintfn "before end %s" (contestJson?name.AsString())
+                                    match elm with
+                                    | Error _ ->
                                         let ctx=getDataContext()
                                         ctx.ContestLog.ContestBeforeEnd.``Create(contestEndTime, contestServerContestId, contestServerContestName, contestStartTime, contest_server_contestServerId)``
                                                                                (
@@ -268,18 +273,25 @@ let rec codeforces ()=
                                                                                    contestJson?startTimeSeconds.AsInteger64(),
                                                                                    contestServerId
                                                                                )|>ignore
-                                        ctx.SubmitUpdates())
+                                        ctx.SubmitUpdates()
+                                    |Ok x ->
+                                        x.ContestStartTime<-contestJson?startTimeSeconds.AsInteger64()
+                                        x.ContestEndTime<-contestJson?startTimeSeconds.AsInteger64()+contestJson?durationSeconds.AsInteger64()
+                                        x.ContestServerContestName<-contestJson?name.AsString()
+                                        ctx.SubmitUpdates()
+                                    )
                        |>ignore
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
                        |>Array.map(fun x->
+                                        x?id.AsInteger().ToString())
+                       |> fun contests -> 
                                         let ctx=getDataContext()
                                         query{
                                             for contestbe in ctx.ContestLog.ContestBeforeEnd do
-                                                where (contestbe.ContestServerContestServerId=contestServerId&&contestbe.ContestServerContestId=(x?id.AsInteger().ToString()))
-                                        }    
-                                            |>FSharp.Data.Sql.Seq.``delete all items from single table``  |>Async.RunSynchronously|>ignore
+                                                where (contestbe.ContestServerContestServerId=contestServerId&&query{for contest in contests do contains contestbe.ContestServerContestId})
+                                        }|>FSharp.Data.Sql.Seq.``delete all items from single table``  |>Async.RunSynchronously|>ignore
                                         ()
-                       )|>ignore
+                       |>ignore
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
                        |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
             addDifficulty()

@@ -58,6 +58,7 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
     this.delProblem=this.delProblem.bind(this);
     this.createVContest=this.createVContest.bind(this);
     this.modifyVContest=this.modifyVContest.bind(this);
+    this.reset=this.reset.bind(this);
   }
   componentDidMount(){
     const storage = localStorage.getItem(selectedProblemsKey);
@@ -86,6 +87,19 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
         }
       }
     });
+  }
+  reset(){
+    this.setState((s)=>({
+      modifyId:null,
+      selected:new Map<number,{url:string,name:string}>(),
+      vinfo:{
+        isSelectedVisible: true,
+        date: "",
+        time: "",
+        duration: 3600,
+        name: "",
+      },
+    }));
   }
   modifyVContest(id:number,vcon:Api.VContestDetails){
     let pmap=new Map<number,{name:string,url:string}>()
@@ -192,6 +206,7 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
         <input type="number" name="duration" value={this.state.vinfo.duration}onChange={(e)=>{this.onVinfoChange(e.target.name,e.target.valueAsNumber)}}/>
         <input type="text" name="name" value={this.state.vinfo.name}onChange={(e)=>{this.onVinfoChange(e.target.name,e.target.value)}}/>
         <button onClick={this.createVContest}>{this.state.modifyId?"Modify Virtual Contest":"Create Virtual Contest"}</button>
+        <button onClick={(e)=>this.reset()}>All Reset</button>
       </footer>
     );
     return (
