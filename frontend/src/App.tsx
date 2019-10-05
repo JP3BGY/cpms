@@ -154,6 +154,7 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
         .then((e)=>{
           this.setState((s)=>({
             selected:new Map<number,{url:string,name:string}>(),
+            modifyId:null,
             vinfo:{
               isSelectedVisible: true,
               date: "",
