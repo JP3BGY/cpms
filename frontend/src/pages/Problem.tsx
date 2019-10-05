@@ -163,11 +163,11 @@ class Problem extends React.Component<{location: History.Location ,history:Histo
                 </div>
                 <table>
                     <thead><tr>
-                        <td>選択</td>
-                        <td>問題名</td>
-                        <td>難易度（サーバー別）</td>
-                        {this.state.isTagVisible && <td>タグ</td>}
-                        <td>サーバー名</td>
+                        <th>選択</th>
+                        <th>問題名</th>
+                        <th>難易度（サーバー別）</th>
+                        {this.state.isTagVisible && <th>タグ</th>}
+                        <th>サーバー名</th>
                     </tr></thead>
                     <tbody>{tbody}</tbody>
                 </table>
