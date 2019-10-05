@@ -13,6 +13,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.HttpsPolicy;
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Headers
 open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Authentication.OAuth
@@ -20,6 +21,7 @@ open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Primitives
 open FSharp.Data
 
 open ContestServer.Setting
@@ -62,7 +64,19 @@ type Startup private () =
                     options.ClaimActions.MapJsonKey("github:login","login")
                     options.Events <- OAuthEvents
                         (
-                            OnCreatingTicket = fun context ->
+                            OnRedirectToAuthorizationEndpoint = fun context ->
+                                            async{
+                                                eprintfn "On Redirect To Login"
+                                                let requestHeaders = RequestHeaders(context.Request.Headers);
+                                                if (requestHeaders.Accept.Any(fun acceptValue -> 
+                                                                                    acceptValue.MediaType.Value.Equals("text/html", 
+                                                                                        StringComparison.OrdinalIgnoreCase))) then
+                                                    context.Response.Redirect(context.RedirectUri);
+                                                else
+                                                    context.Response.Headers.["Location"] <- StringValues context.RedirectUri;
+                                                    context.Response.StatusCode <- 401;
+                                            }|>Async.StartAsTask:>Task
+                            ,OnCreatingTicket = fun context ->
                                 async{
                                     let httpGetWithToken (url:string) = 
                                         let request = new HttpRequestMessage (System.Net.Http.HttpMethod.Get ,url)
