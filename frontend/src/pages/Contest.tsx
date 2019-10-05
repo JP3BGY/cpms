@@ -51,9 +51,9 @@ class Contest extends React.Component<{},{isAwait:Boolean,err:Api.Status,contest
             <main>
                 <table>
                     <thead><tr>
-                        <td>コンテスト名</td>
-                        <td>開始時間</td>
-                        <td>コンテストサーバー</td>
+                        <th>コンテスト名</th>
+                        <th>開始時間</th>
+                        <th>コンテストサーバー</th>
                     </tr></thead>
                     <tbody>{tbody}</tbody>
                 </table>
