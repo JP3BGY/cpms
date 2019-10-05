@@ -131,16 +131,22 @@ let submissionDb2SubmissionWithUSC submissionDb userId serverName contestId=
     }
 let submissionDb2SubmissionWithU submissionDb userId =
     let ctx = getDataContext()
-    let (serverName,contestId) = 
+    let contestId = 
         query{
             for problem in ctx.ContestLog.Problem do
-                for contest in ctx.ContestLog.Contest do
-                    for contestServer in ctx.ContestLog.ContestServer do
-                        where (problem.ProblemId = submissionDb.ProblemProblemId && contest.ContestId = problem.ProblemId && contestServer.ContestServerId = contest.ContestServerContestServerId)
-                        select (contestServer.ContestServerName,contest.ContestServerContestId)
-                        exactlyOne
+                join contest in ctx.ContestLog.Contest on (problem.ContestContestId = contest.ContestId)
+                where (problem.ProblemId = submissionDb.ProblemProblemId )
+                select (contest)
+                exactlyOne
         }
-    submissionDb2SubmissionWithUSC submissionDb userId serverName contestId
+    let serverName =
+        query{
+            for cserver in ctx.ContestLog.ContestServer do
+                where(cserver.ContestServerId = contestId.ContestServerContestServerId)
+                select (cserver)
+                exactlyOne
+        }
+    submissionDb2SubmissionWithUSC submissionDb userId (serverName.ContestServerName) (contestId.ContestServerContestId)
 let getSolverOfProblem problemId userId = 
     let ctx = getDataContext()
     let elms = 
