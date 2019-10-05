@@ -1,5 +1,6 @@
 namespace ContestServer.Types
 open System
+[<CLIMutable>]
 type Contest =
     {
         dbId:Int32
@@ -8,6 +9,7 @@ type Contest =
         url:string
         contestServer:string
     }
+[<CLIMutable>]
 type Submission = 
     {
         problemId:Int32
@@ -16,6 +18,7 @@ type Submission =
         submissionStatus:string
         url:string
     }
+[<CLIMutable>]
 type Problem = 
     {
         dbId:Int32
@@ -26,29 +29,33 @@ type Problem =
         difficulty:Nullable<Double>
         contestDbId:Int32
     }
+[<CLIMutable>]
 type UserContestId =
     {
         id:string
         contestServerName:string
     }
+[<CLIMutable>]
 type UserInfo = 
     {
         dbId:Int32
         userName:string
         userContestIds:UserContestId[]
     }
+[<CLIMutable>]
 type ErrorStatus =
     {
         code:Int16
         result:string
         url:string
     }
-type ProblemAndSubmission = 
+[<CLIMutable>]
     {
         problems:Problem[]
         submissions:Submission[]
+[<CLIMutable>]
     }
-type ProblemResponse =
+[<CLIMutable>]
     {
         problems:Problem[]
         elmNum:int
