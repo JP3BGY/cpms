@@ -171,10 +171,10 @@ CREATE TABLE IF NOT EXISTS `contest_log`.`problem_submissions` (
   `contest_users_userId` INT NOT NULL,
   `submission_time` BIGINT NOT NULL,
   `submission_status` VARCHAR(5) NOT NULL,
-  `contestServerSubmissonId` BIGINT NOT NULL,
+  `contestServerSubmissionId` BIGINT NOT NULL,
   INDEX `fk_problem_solver_problem1_idx` (`problem_problemId` ) ,
   INDEX `fk_problem_solver_contest_users1_idx` (`contest_users_userId` ) ,
-  PRIMARY KEY (`problem_problemId`, `contest_users_userId`, `contestServerSubmissonId`),
+  PRIMARY KEY (`problem_problemId`, `contest_users_userId`, `contestServerSubmissionId`),
   CONSTRAINT `fk_problem_solver_problem1`
     FOREIGN KEY (`problem_problemId`)
     REFERENCES `contest_log`.`problem` (`problemId`)
