@@ -19,9 +19,9 @@ open FSharp.Data
 type UserController (logger : ILogger<UserController>) =
     inherit ControllerBase()
     [<HttpPost("addcontestuser")>]
-    member __.AddContestUser([<FromBody>] (contestUser:SetContestUser)) =
+    member __.AddContestUser([<FromBody>] (contestUser:UserContestId)) =
         let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
-        let res=setContestUser userInfo (contestUser.contestServer) (contestUser.contestUserId)
+        let res=setContestUser userInfo (contestUser.contestServerName) (contestUser.id)
         match res  with
         | Ok _ -> __.Ok():>ActionResult
         | Error err ->
@@ -32,3 +32,21 @@ type UserController (logger : ILogger<UserController>) =
                     url = null
                 }
             __.StatusCode(500,res):>ActionResult
+    [<HttpPost("delcontestuser")>]
+    member __.DelContestUser([<FromBody>] (contestUser:UserContestId)) =
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
+        let res=delContestUser userInfo (contestUser.contestServerName) (contestUser.id)
+        match res  with
+        | Ok _ -> __.Ok():>ActionResult
+        | Error err ->
+            let res =
+                {
+                    code =500s
+                    result = err
+                    url = null
+                }
+            __.StatusCode(500,res):>ActionResult
+    [<HttpGet("getmyinfo")>]
+    member __.GetMyInfo()=
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
+        __.Ok(userInfo)
