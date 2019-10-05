@@ -42,7 +42,7 @@ let rec codeforces ()=
         let ctx = getDataContext()
         let problemElm = ctx.ContestLog.Problem.``Create(contestServerProblemId, contest_contestId, problemName)``(problem?index.AsString(),contestId,problem?name.AsString())
         ctx.SubmitUpdates()
-        eprintfn "problemDbId %d" problemElm.ProblemId
+        eprintfn "[Codeforces] problemDbId %d" problemElm.ProblemId
         match problem.TryGetProperty("rating") with
         | None -> ()
         | Some(x) -> ctx.ContestLog.ProblemDifficulty.``Create``(problem?rating.AsFloat(),problemElm.ProblemId)|>ignore
@@ -102,7 +102,7 @@ let rec codeforces ()=
 
     let insertSolversInContest contestTime problemDbId handles prDict =
         let ctx = getDataContext()
-        eprintfn "insertSolversInContest problemDbId %d" problemDbId
+        eprintfn "[Codeforces] insertSolversInContest problemDbId %d" problemDbId
         handles|>Array.map(getOrInsertUser)
                |>Array.map(fun x -> 
                                 let ret=ctx.ContestLog.ProblemSolverInContest.``Create(contest_users_userId, problem_problemId, rating)``(x.UserId,problemDbId,(getRating contestTime x.ContestUserId prDict))
@@ -115,7 +115,7 @@ let rec codeforces ()=
     let insertContestAndProblemsAndParticipants contestId =
         let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
         try
-            eprintfn "contest %d" contestId
+            eprintfn "[Codeforces] contest %d" contestId
             let prDict =  
                 let participantsRating=Http.RequestString("https://codeforces.com/api/contest.ratingChanges?contestId="+contestId.ToString(),silentHttpErrors=true)|>JsonValue.Parse
                 webSleep()
@@ -125,7 +125,7 @@ let rec codeforces ()=
             (extractUsers (problemsAndParticipants?result?rows.AsArray()))
                 |>fun x ->makeParticipantsRatingCache x prDict|>ignore
             let contestTime = problemsAndParticipants?result?contest?startTimeSeconds.AsInteger64()
-            eprintfn "prDict %s" (prDict.ToString()) 
+            eprintfn "[Codeforces] prDict %s" (prDict.ToString()) 
             use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
                                                    transactionopt,
                                                    TransactionScopeAsyncFlowOption.Enabled)
@@ -137,7 +137,7 @@ let rec codeforces ()=
                                                             problemsAndParticipants?result?contest?startTimeSeconds.AsInteger64(),
                                                             contestServerId)
             ctx.SubmitUpdates()
-            eprintfn "contestDbId %d" contestElm.ContestId
+            eprintfn "[Codeforces] contestDbId %d" contestElm.ContestId
 
             let problemIdArr = problemsAndParticipants?result?problems.AsArray()|>Array.map(insertProblem contestElm.ContestId)
 
@@ -149,33 +149,33 @@ let rec codeforces ()=
                                 let ret=ctx.ContestLog.ContestParticipants.``Create(contest_contestId, rating)``(contestElm.ContestId,x)
                                 ctx.SubmitUpdates()
                                 ret)|>ignore
-            eprintfn "Participants"
+            eprintfn "[Codeforces] Participants"
 
             let problemSolverInContestArr = 
                 [|0..problemIdArr.Length-1|]
                     |>Array.map(fun x -> (problemIdArr.[x],
                                           filterSolver (problemsAndParticipants?result?rows.AsArray()) x))
-            eprintfn "problemSolverInContestArr"
+            eprintfn "[Codeforces] problemSolverInContestArr"
             problemSolverInContestArr
                 |>Array.map(fun (problemDbId,solvers)->insertSolversInContest contestTime problemDbId solvers prDict)|>ignore
             ctx.SubmitUpdates()
-            eprintfn "Problem Solver"
+            eprintfn "[Codeforces] Problem Solver"
             transaction.Complete()
-            eprintfn "%d done" contestId
+            eprintfn "[Codeforces] %d done" contestId
             transaction.Dispose()
             GC.Collect()
             ()
         with
         | :? WebException as we -> 
-            eprintfn "Can't save contest %d %s" contestId we.Message 
-            Console.Error.WriteLine("uri:{0}",we.Response.ResponseUri)
+            eprintfn "[Codeforces] Can't save contest %d %s" contestId we.Message 
+            Console.Error.WriteLine("[Codeforces] uri:{0}",we.Response.ResponseUri)
             use data = we.Response.GetResponseStream()
             let streamr=new StreamReader(data)
-            eprintfn "%s" (streamr.ReadToEnd())
+            eprintfn "[Codeforces] %s" (streamr.ReadToEnd())
             GC.Collect()
             ()
         | :? TransactionAbortedException as te ->
-            eprintfn "Transaction Error %d %s" contestId te.Message
+            eprintfn "[Codeforces] Transaction Error %d %s" contestId te.Message
             GC.Collect()
             ()
     
@@ -193,9 +193,9 @@ let rec codeforces ()=
             use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
                                                    transactionopt,
                                                    TransactionScopeAsyncFlowOption.Enabled)
-            eprintfn "Start addDifficulty"
+            eprintfn "[Codeforces] Start addDifficulty"
             let ctx = getDataContext()
-            eprintfn "Get Elms"
+            eprintfn "[Codeforces] Get Elms"
             let elms = 
                 query{
                     for problem in ctx.ContestLog.Problem do
@@ -208,13 +208,13 @@ let rec codeforces ()=
                         select (contest.ContestId,contest.ContestServerContestId)
                         distinct
                 }|>Seq.toArray
-            eprintfn "map elms %d" (elms.Length)
+            eprintfn "[Codeforces] map elms %d" (elms.Length)
             elms|>Array.map(
                 fun (dbId,contestId)->
-                    eprintfn "add Difficulty of %s" contestId
+                    eprintfn "[Codeforces] add Difficulty of %s" contestId
                     let contestRes = Http.RequestString("https://codeforces.com/api/contest.standings?contestId="+contestId.ToString()+"&from=1&count=1")
                     webSleep()
-                    eprintfn "%s" contestRes
+                    eprintfn "[Codeforces] %s" contestRes
                     let problems = JsonValue.Parse(contestRes)?result?problems.AsArray()
                     problems|>
                         Array.map(
@@ -222,7 +222,7 @@ let rec codeforces ()=
                                 match problem.TryGetProperty("rating") with
                                 | None -> ()
                                 | Some(x) -> 
-                                    eprintfn "Difficulty %f" (x.AsFloat())
+                                    eprintfn "[Codeforces] Difficulty %f" (x.AsFloat())
                                     let elm = 
                                         query{
                                             for p in ctx.ContestLog.Problem do
@@ -236,14 +236,14 @@ let rec codeforces ()=
                 )|>ignore
             ctx.SubmitUpdates()
             transaction.Complete()
-            eprintfn "All complete"
+            eprintfn "[Codeforces] All complete"
         with
         | :? TransactionAbortedException as te ->
-            eprintfn "Transaction Error in addDifficulty %s" te.Message
+            eprintfn "[Codeforces] Transaction Error in addDifficulty %s" te.Message
             GC.Collect()
             ()
     async{
-        eprintfn "Codeforces crawler start!" |> ignore
+        eprintfn "[Codeforces] Codeforces crawler start!" |> ignore
         try
             let contestsRes=Http.RequestString("https://codeforces.com/api/contest.list")
             webSleep()
@@ -261,7 +261,7 @@ let rec codeforces ()=
                                         with
                                         | :? Exception as e->
                                             Error()
-                                    eprintfn "before end %s" (contestJson?name.AsString())
+                                    eprintfn "[Codeforces] before end %s" (contestJson?name.AsString())
                                     match elm with
                                     | Error _ ->
                                         let ctx=getDataContext()
@@ -295,15 +295,15 @@ let rec codeforces ()=
             contestsArr|>Array.filter(fun contestJson -> contestJson?phase.AsString() = "FINISHED")
                        |>Array.filter(fun contestJson -> not (isContestInDb (contestJson?id.AsInteger().ToString()))) |>Array.map(fun contestJson -> insertContestAndProblemsAndParticipants (contestJson?id.AsInteger()))|>ignore
             addDifficulty()
-            eprintfn "Update Done"
+            eprintfn "[Codeforces] Update Done"
             cfDeleteAllCache()|>ignore
-            eprintfn "Delete all cache"
+            eprintfn "[Codeforces] Delete all cache"
             let ctx = getDataContext()
             let cnt = query{
                 for contestbe in ctx.ContestLog.ContestBeforeEnd do
                     count
             }
-            eprintfn "count:%d" cnt
+            eprintfn "[Codeforces] count:%d" cnt
             let nextCrawleTime = if cnt = 0 then TimeSpan.FromHours(3.0) 
                                     else
                                         let nowunixtime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
@@ -320,7 +320,7 @@ let rec codeforces ()=
             codeforces()|>Async.RunSynchronously|>ignore
         with
         | :? WebException as we ->
-            eprintfn "API Connection Error %s" we.Message
+            eprintfn "[Codeforces] API Connection Error %s" we.Message
             Threading.Thread.Sleep(TimeSpan.FromSeconds(1.0))
             codeforces()|>Async.RunSynchronously|>ignore
     }
@@ -353,7 +353,7 @@ let rec userCodeforces () =
         |"TESTING"->SubmissionStatus.WJ
         |"REJECTED"->SubmissionStatus.IG
         |x->
-            eprintfn "convertVerdict2SubmissionStatus %s" x
+            eprintfn "[UserCodeforces] convertVerdict2SubmissionStatus %s" x
             SubmissionStatus.IG
     let getUserSubmissions handle =
         let submissions=Http.RequestString("https://codeforces.com/api/user.status?handle="+handle)|>JsonValue.Parse
@@ -377,6 +377,7 @@ let rec userCodeforces () =
                 exactlyOne
         }
         let insertUserSubmission (contestId,problemIndex,creationTime,ss,submissionId) =
+            eprintfn "[UserCodeforces] insert User Submission %d %s %d %s %d" contestId problemIndex creationTime (submissionStatusToString ss) submissionId
             let contestDbId = query{
                 for contest in ctx.ContestLog.Contest do
                     where ((contest.ContestServerContestServerId=contestServerDbId)&&(contest.ContestServerContestId=contestId.ToString()))
@@ -410,7 +411,7 @@ let rec userCodeforces () =
         ()
             
     async{
-        eprintfn "userCodeforces Start!"
+        eprintfn "[UserCodeforces] userCodeforces Start!"
         let ctx = getDataContext()
         let handles = 
             query{
@@ -421,9 +422,9 @@ let rec userCodeforces () =
                             select user.ContestUserId
             }|>Seq.toList
         handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
-        eprintfn "userCodeforces ends"
+        eprintfn "[UserCodeforces] userCodeforces ends"
         let nextCrawleTime = TimeSpan.FromMinutes(1.0)
-        Console.WriteLine ("SleepTime {0}",nextCrawleTime)
+        Console.WriteLine ("[UserCodeforces] SleepTime {0}",nextCrawleTime)
         Threading.Thread.Sleep(nextCrawleTime)
-        codeforces()|>Async.RunSynchronously|>ignore
+        userCodeforces()|>Async.RunSynchronously|>ignore
     }
