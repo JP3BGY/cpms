@@ -50,15 +50,28 @@ type ErrorStatus =
         url:string
     }
 [<CLIMutable>]
-    {
-        problems:Problem[]
-        submissions:Submission[]
-[<CLIMutable>]
-    }
-[<CLIMutable>]
+type ProblemResponse =
     {
         problems:Problem[]
         elmNum:int
+    }
+[<CLIMutable>]
+type VContest =
+    {
+        dbId:Int32
+        name:string
+        startTime:Int64
+        endTime:Int64
+        participants:UserInfo []
+        creator:UserInfo
+    }
+[<CLIMutable>]
+type VContestDetails = 
+    {
+        vContest: VContest
+        problems:Problem[]
+        submissions:Submission[]
+        isCreator:bool
     }
 
 //Input Type
@@ -75,4 +88,5 @@ type CreateVirtualContest =
         problems:int[]
         startTime: int64
         duration:Int64
+        name:string
     }

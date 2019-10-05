@@ -21,13 +21,27 @@ type VContestDb =
         EndTime:Int64
         CreatedUserUserIduser:Int32
     }
-type VContest =
+let getVirtualContest vContestDb =
+    let ctx = getDataContext()
     {
-        dbId:Int32
-        startTime:Int64
-        endTime:Int64
-        participants:UserInfo []
-        creator:UserInfo
+        dbId = vContestDb.IdvirtualContest
+        startTime = vContestDb.StartTime
+        endTime = vContestDb.EndTime
+        participants = 
+            query{
+                for vconParticipants in ctx.ContestLog.VirtualContestParticipants do
+                    where (vconParticipants.VirtualContestIdvirtualContest = vContestDb.IdvirtualContest)
+                    select (vconParticipants.UserIduser)
+            }|>Seq.map(getUserInfoFromId)|>Seq.toArray
+        creator = 
+            getUserInfoFromId (vContestDb.CreatedUserUserIduser)
+        name =
+            query{
+                for vConName in ctx.ContestLog.VirtualContestName do
+                    where (vConName.VirtualContestIdvirtualContest = vContestDb.IdvirtualContest)
+                    select (vConName.VirtualContestName)
+                    exactlyOneOrDefault
+            }
     }
 let getProblemsOfVirtualContest dbId (userInfo:UserInfo) =
     let nowUnixTime = DateTimeOffset.Now.ToUnixTimeSeconds()
@@ -36,7 +50,8 @@ let getProblemsOfVirtualContest dbId (userInfo:UserInfo) =
         query{
             for vcon in ctx.ContestLog.VirtualContest do
                 where (vcon.IdvirtualContest = dbId && (vcon.CreatedUserUserIduser = userInfo.dbId || vcon.StartTime >= nowUnixTime))
-        }
+        }|>Seq.map(fun x->x.MapTo<VContestDb>())
+        |>Seq.map(getVirtualContest)
     if Seq.isEmpty elm then
         Error("No such contest found or you have no permission to see.")
     else 
@@ -57,23 +72,8 @@ let getProblemsOfVirtualContest dbId (userInfo:UserInfo) =
                                 select (submission,wuser.UserIduser)
             }|>Seq.map(fun (x,y)-> (x.MapTo<SubmissionDb>(),y))
             |>Seq.map(fun (x,y)->submissionDb2SubmissionWithU x y)|>Seq.toArray
-        Ok(problems,submissions)
+        Ok(Seq.head elm,problems,submissions)
 
-let getVirtualContest vContestDb =
-    let ctx = getDataContext()
-    {
-        dbId = vContestDb.IdvirtualContest
-        startTime = vContestDb.StartTime
-        endTime = vContestDb.EndTime
-        participants = 
-            query{
-                for vconParticipants in ctx.ContestLog.VirtualContestParticipants do
-                    where (vconParticipants.VirtualContestIdvirtualContest = vContestDb.IdvirtualContest)
-                    select (vconParticipants.UserIduser)
-            }|>Seq.map(getUserInfoFromId)|>Seq.toArray
-        creator = 
-            getUserInfoFromId (vContestDb.CreatedUserUserIduser)
-    }
 let getVirtualContests()=
     let ctx = getDataContext()
     query{
@@ -103,7 +103,109 @@ let getPastVirtualContests() =
             select (vcontest)
     }|>Seq.map(fun x->x.MapTo<VContestDb>())
     |>Seq.map(getVirtualContest)
-let createContest (creatorInfo:UserInfo) startTime duration (problems:int[]) = 
+let deleteContest (creatorInfo:UserInfo) dbId =
+    let ctx = getDataContext()
+    let elm = 
+        query{
+            for vcontest in ctx.ContestLog.VirtualContest do
+                where (dbId = vcontest.IdvirtualContest && vcontest.CreatedUserUserIduser = creatorInfo.dbId)
+        }
+    if Seq.isEmpty elm then
+        Error("No such Virtual Contest found")
+    else
+        use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
+                                               TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable),
+                                               TransactionScopeAsyncFlowOption.Enabled)
+        let delname = 
+            query{
+                for vname in ctx.ContestLog.VirtualContestName do
+                    where (dbId = vname.VirtualContestIdvirtualContest)
+            }
+        let delnameasync = Seq.``delete all items from single table``(delname) 
+        let delp = 
+            query{
+                for p in ctx.ContestLog.VirtualContestParticipants do
+                    where (p.VirtualContestIdvirtualContest = dbId)
+            }
+        let delpasync = Seq.``delete all items from single table`` (delp)
+        let delprob =
+            query{
+                for p in ctx.ContestLog.VirtualContestProblems do
+                    where (p.VirtualContestIdvirtualContest = dbId)
+            }
+        let delprobasync = Seq.``delete all items from single table``(delprob)
+        [|delpasync;delprobasync;delnameasync|]|>Async.Parallel|>Async.RunSynchronously|>ignore
+        ctx.SubmitUpdates()
+        Seq.``delete all items from single table``(elm)|>Async.RunSynchronously|>ignore
+        ctx.SubmitUpdates()
+        transaction.Complete()
+        Ok()
+let modifyContest dbId (creatorInfo:UserInfo) startTime duration (problems:int[]) name=
+    let ctx = getDataContext()
+    let maybeelm = 
+        try
+            let e=query{
+                for vcontest in ctx.ContestLog.VirtualContest do
+                    where (dbId = vcontest.IdvirtualContest && vcontest.CreatedUserUserIduser = creatorInfo.dbId)
+                    exactlyOne
+            }
+            Ok(e)
+        with
+        | :? SystemException as e ->
+            Error()
+    match maybeelm with 
+    | Error  _ ->
+        Error("No such Virtual Contest found")
+    | Ok elm ->
+        let isProbExist = 
+            not (Array.exists 
+                (fun p ->
+                    not (query{
+                        for prob in ctx.ContestLog.Problem do
+                            select prob.ProblemId
+                            contains p
+                    }))
+                problems
+            )
+        if isProbExist then
+            let nowTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            if startTime + duration - nowTime < 5L*60L then
+                Error("already ended or soon will end")
+            else 
+                use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
+                                                       TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable),
+                                                       TransactionScopeAsyncFlowOption.Enabled)
+                elm.StartTime <- startTime
+                elm.EndTime <- startTime+duration
+                let nameElms = 
+                    query{
+                        for name in ctx.ContestLog.VirtualContestName do
+                            where (name.VirtualContestIdvirtualContest = dbId)
+                    }
+                let _ =
+                    if Seq.isEmpty nameElms then
+                        ctx.ContestLog.VirtualContestName.``Create(virtualContestName, virtual_contest_idvirtual_contest)``(name,dbId)
+                    else
+                        let nameElm = Seq.head(nameElms)
+                        nameElm.VirtualContestName <- name
+                        nameElm
+                let probElms =
+                    query{
+                        for vprob in ctx.ContestLog.VirtualContestProblems do
+                            where(vprob.VirtualContestIdvirtualContest = dbId)
+                    }
+                Seq.``delete all items from single table``(probElms)|>Async.RunSynchronously|>ignore
+                ctx.SubmitUpdates()
+                problems|>Array.map(
+                    fun p ->
+                        ctx.ContestLog.VirtualContestProblems.``Create(problem_problemId, virtual_contest_idvirtual_contest)``(p,dbId)
+                )|>ignore
+                ctx.SubmitUpdates()
+                transaction.Complete()
+                Ok()
+        else
+            Error("No such problem found")
+let createContest (creatorInfo:UserInfo) startTime duration (problems:int[]) name= 
     let nowTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
     if nowTime >= startTime+duration then
         Error "This contest already ended."
@@ -133,12 +235,14 @@ let createContest (creatorInfo:UserInfo) startTime duration (problems:int[]) =
             else
                 try
                     let ctx = getDataContext()
-                    let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
                     use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
-                                                           transactionopt,
+                                                           TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable),
                                                            TransactionScopeAsyncFlowOption.Enabled)
                     let contestElm=ctx.ContestLog.VirtualContest.``Create(createdUser_user_iduser, endTime, startTime)``(creatorInfo.dbId,startTime+duration,startTime)
                     ctx.SubmitUpdates()
+                    if not (isNull name) &&  name<>"" then
+                        ctx.ContestLog.VirtualContestName.``Create(virtualContestName, virtual_contest_idvirtual_contest)``(name,contestElm.IdvirtualContest)|>ignore
+                        ctx.SubmitUpdates()
                     ctx.ContestLog.VirtualContestParticipants.``Create(user_iduser, virtual_contest_idvirtual_contest)``(creatorInfo.dbId,contestElm.IdvirtualContest)|>ignore
                     problems
                         |> Array.map(
@@ -157,6 +261,7 @@ let createContest (creatorInfo:UserInfo) startTime duration (problems:int[]) =
                     let vcontest = 
                         {
                             dbId = contestElm.IdvirtualContest
+                            name = name
                             startTime = startTime
                             endTime = startTime + duration
                             creator = creatorInfo

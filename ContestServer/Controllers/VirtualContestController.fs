@@ -23,14 +23,17 @@ type VirtualContestController (logger : ILogger<VirtualContestController>) =
     member __.GetVirtualContests() =
         let elms = getVirtualContests ()
         base.Ok(elms)
-    [<HttpGet("problems/{id}")>]
-    member __.GetProblems(id) =
+    [<HttpGet("details/{id}")>]
+    member __.GetDetails(id) =
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
         let res = getProblemsOfVirtualContest id (getUserInfoFromControllerBase (__:>ControllerBase))
         match res with
-        | Ok (probs,subs)->
+        | Ok (vcon,probs,subs)->
             base.Ok({
+                vContest = vcon
                 problems=probs
                 submissions=subs
+                isCreator = vcon.creator.dbId = userInfo.dbId
             }):>ActionResult
         | Error err ->
             let res = 
@@ -42,14 +45,63 @@ type VirtualContestController (logger : ILogger<VirtualContestController>) =
             __.StatusCode(500,res):>ActionResult
 
     [<HttpPost("create")>]
-    member this.Post([<FromBody>] setting) =
+    member __.Create([<FromBody>] setting) =
         let duration = setting.duration
         let problemIds = setting.problems
         let startTime = setting.startTime
-        let userInfo = getUserInfoFromControllerBase (this:>ControllerBase)
-        let result = createContest userInfo startTime duration problemIds
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
+        if System.Text.ASCIIEncoding.Unicode.GetByteCount(setting.name) > 250 then  
+            let res = 
+                {
+                    code=500s
+                    result = "name is too long"
+                    url = null
+                }
+            __.StatusCode(500,res):>ActionResult
+        else 
+            let result = createContest userInfo startTime duration problemIds (setting.name)
+            match result with
+            | Ok x -> __.Ok(x):>ActionResult
+            | Error err -> 
+                let res = 
+                    {
+                        code=500s
+                        result = err
+                        url = null
+                    }
+                __.StatusCode(500,res):>ActionResult
+    [<HttpPost("modify/{id}")>]
+    member __.Modify(id:int,[<FromBody>] setting) =
+        let duration = setting.duration
+        let problemIds = setting.problems
+        let startTime = setting.startTime
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
+        if System.Text.ASCIIEncoding.Unicode.GetByteCount(setting.name) > 250 then  
+            let res = 
+                {
+                    code=500s
+                    result = "name is too long"
+                    url = null
+                }
+            __.StatusCode(500,res):>ActionResult
+        else 
+            let result = modifyContest id userInfo startTime duration problemIds (setting.name)
+            match result with
+            | Ok x -> __.Ok(x):>ActionResult
+            | Error err -> 
+                let res = 
+                    {
+                        code=500s
+                        result = err
+                        url = null
+                    }
+                __.StatusCode(500,res):>ActionResult
+    [<HttpPost("delete/{id}")>]
+    member __.Delete(id:int) =
+        let userInfo = getUserInfoFromControllerBase (__:>ControllerBase)
+        let result = deleteContest userInfo id
         match result with
-        | Ok x -> this.Ok(x):>ActionResult
+        | Ok x -> __.Ok(x):>ActionResult
         | Error err -> 
             let res = 
                 {
@@ -57,10 +109,10 @@ type VirtualContestController (logger : ILogger<VirtualContestController>) =
                     result = err
                     url = null
                 }
-            this.StatusCode(500,res):>ActionResult
+            __.StatusCode(500,res):>ActionResult
     [<HttpPost("join/{id}")>]
-    member this.JoinVitualContest(id:int) =
-        let userInfo = getUserInfoFromControllerBase(this:>ControllerBase)
+    member __.JoinVitualContest(id:int) =
+        let userInfo = getUserInfoFromControllerBase(__:>ControllerBase)
         let ctx = getDataContext()
         let vcontestIsNotExist = 
             query{
@@ -76,24 +128,39 @@ type VirtualContestController (logger : ILogger<VirtualContestController>) =
                 }
             base.NotFound(res):>ActionResult
         else 
-            try 
-                let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
-                use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
-                                                       transactionopt,
-                                                       TransactionScopeAsyncFlowOption.Enabled)
-                let elm = ctx.ContestLog.VirtualContestParticipants.``Create(user_iduser, virtual_contest_idvirtual_contest)``(userInfo.dbId,id)
-                ctx.SubmitUpdates()
-                transaction.Complete()
-                this.Ok():>ActionResult
-            with
-            | :? TransactionAbortedException as te ->
-                eprintfn "Transaction Error: Can't Create User \n      %s" te.Message
-                GC.Collect()
+            let notInContest = 
+                query{
+                    for joiner in ctx.ContestLog.VirtualContestParticipants do
+                        where (joiner.VirtualContestIdvirtualContest=id && joiner.UserIduser = userInfo.dbId)
+                }|>Seq.isEmpty
+            if notInContest then
+                try 
+                    let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+                    use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
+                                                           transactionopt,
+                                                           TransactionScopeAsyncFlowOption.Enabled)
+                    let elm = ctx.ContestLog.VirtualContestParticipants.``Create(user_iduser, virtual_contest_idvirtual_contest)``(userInfo.dbId,id)
+                    ctx.SubmitUpdates()
+                    transaction.Complete()
+                    __.Ok():>ActionResult
+                with
+                | :? Exception as e ->
+                    eprintfn "Transaction Error: Can't Create User \n      %s" e.Message
+                    GC.Collect()
+                    let res =
+                        {
+                            code =500s
+                            result = "Internal Server Error"
+                            url = null
+                        }
+                    __.StatusCode(500,res):>ActionResult
+            else
                 let res =
                     {
                         code =500s
-                        result = "Internal Server Error"
+                        result = "Already joined"
                         url = null
                     }
-                this.StatusCode(500,res):>ActionResult
+                __.StatusCode(500,res):>ActionResult
+
         
