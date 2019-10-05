@@ -72,16 +72,13 @@ class App extends React.Component<{},{selected:Map<number,{url:string,name:strin
       console.log(s);
       console.log(value);
       console.log(name);
-      let x=(name === "isSelectedVisible" ? value: s.vinfo.isSelectedVisible);
-      let y=(name === "date" ? value: s.vinfo.date);
-      let z=(name === "time" ? value: s.vinfo.time);
-      let w=(name === "duration" ? value: s.vinfo.duration);
       return {
         vinfo: {
-          isSelectedVisible: x,
-          date: y,
-          time: z,
-          duration: w,
+          isSelectedVisible: (name === "isSelectedVisible" ? value: s.vinfo.isSelectedVisible),
+          date: (name === "date" ? value: s.vinfo.date),
+          time: (name === "time" ? value: s.vinfo.time),
+          duration: (name === "duration" ? value: s.vinfo.duration),
+          name: (name==="name"?value:s.vinfo.name)
         }
       }
     });
