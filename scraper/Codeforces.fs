@@ -113,7 +113,7 @@ let rec codeforces ()=
         ()
 
     let insertContestAndProblemsAndParticipants contestId =
-        let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+        let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead)
         try
             eprintfn "[Codeforces] contest %d" contestId
             let prDict =  
@@ -188,7 +188,7 @@ let rec codeforces ()=
         not (Seq.isEmpty elm)
 
     let addDifficulty () =
-        let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+        let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead)
         try
             use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
                                                    transactionopt,
@@ -393,10 +393,10 @@ let rec userCodeforces () =
             let inDb = 
                 query{
                     for submission in ctx.ContestLog.ProblemSubmissions do
-                        where (submission.ContestServerSubmissonId = submissionId && submission.ContestUsersUserId=userDbId && submission.ProblemProblemId=problemDbId)
+                        where (submission.ContestServerSubmissionId = submissionId && submission.ContestUsersUserId=userDbId && submission.ProblemProblemId=problemDbId)
                 }
             if Seq.isEmpty inDb then 
-                ctx.ContestLog.ProblemSubmissions.``Create(contestServerSubmissonId, contest_users_userId, problem_problemId, submission_status, submission_time)`` (submissionId,userDbId,problemDbId,submissionStatusToString ss,creationTime)
+                ctx.ContestLog.ProblemSubmissions.``Create(contestServerSubmissionId, contest_users_userId, problem_problemId, submission_status, submission_time)`` (submissionId,userDbId,problemDbId,submissionStatusToString ss,creationTime)
                 |>ignore
                 ctx.SubmitUpdates()
                 ()
