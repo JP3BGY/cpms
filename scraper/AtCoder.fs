@@ -8,7 +8,6 @@ open System.Transactions
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open FSharp.Data.Runtime.Caching
-type OldAtCoderSubmissionsJson = JsonProvider<"../data/atcoderSubmissions.json">
 let getAtCoderDbId () =
     let ctx=getDataContext()
     let elm=
@@ -74,15 +73,15 @@ let getOldContestSubmissionUrl contest =
 let insertSubmissions () =
     try
         let ctx=getDataContext()
-        let handleArr = 
+        let handleMap = 
             query{
                 for wuser in ctx.ContestLog.WatchingUser do
                     for cuser in ctx.ContestLog.ContestUsers do 
                         for contestServer in ctx.ContestLog.ContestServer do
                             where (wuser.ContestUsersUserId = cuser.UserId && contestServer.ContestServerId = cuser.ContestServerContestServerId && contestServer.ContestServerName = "AtCoder")
                             select (cuser.ContestUserId,cuser.UserId)
-            }|>Seq.toArray
-        eprintfn "[UserAtcoder] handles %s" (handleArr.ToString())
+            }|>Map.ofSeq
+        eprintfn "[UserAtcoder] handles %s" (handleMap.ToString())
         let contests = 
                 query{
                     for contest in ctx.ContestLog.Contest do
@@ -104,74 +103,44 @@ let insertSubmissions () =
                         where(prob.ContestContestId = contestElm.ContestId)
                         select(prob.ContestServerProblemId,prob.ProblemId)
                 }|>Map.ofSeq
-            let rec getSubmissionsFromPage (handle,userDbId) page =
-                eprintfn "[userAtCoder] Now %s %s %d" cId handle page
-                try
-                    let res = HtmlDocument.Load((getContestSubmissionUrl cId page handle))
-                    webSleep()
-                    let x=
-                        res.CssSelect "tbody > tr"
-                    if Seq.isEmpty x then
-                        eprintfn "[userAtCoder] Nothing to do %s %s %d" cId handle page
-                        ()
-                    else
-                        eprintfn "[userAtCoder] collect submissions %s %s %d" cId handle page
-                        x|>List.map(
-                            fun x->
-                                eprintfn "[userAtCoder] %s" (x.ToString())
-                                x.Descendants["td"]|>Seq.toArray
-                                    |>fun x->
-                                        let getLast = 
-                                            fun (x:string)->
-                                                let y=x.Split("/")
-                                                y.[y.Length-1]
-                                        eprintfn "[userAtCoder] in td %s" (x.[6].Elements().[0].Elements().[0].ToString())
-                                        let submissionTime = (DateTimeOffset.Parse(x.[0].InnerText())).ToUnixTimeSeconds()
-                                        eprintfn "[userAtCoder] submissionTime %d" submissionTime
-                                        let problemId = (Seq.head (x.[1].Descendants ["a"])).TryGetAttribute("href")|>Option.map(fun x-> getLast(x.Value()))
-                                        eprintfn "[userAtCoder] problemId %s" (problemId.ToString())
-                                        let serverSubmissionId = (Seq.head(x.[x.Length-1].Descendants["a"])).TryGetAttribute("href")|>Option.map(fun x->getLast(x.Value()))
-                                        eprintfn "[userAtCoder] serverSubmissionId %s" (serverSubmissionId.ToString())
-                                        let statusStr = submissionStatusToString (atCoderStatus2Status (x.[6].Elements().[0].Elements().[0].ToString()))
-                                        eprintfn "[userAtCoder] %s %s" statusStr ((x.[6].InnerText()))
-                                        match problemId with
-                                        | Some pId ->
-                                            match serverSubmissionId with
-                                            | Some sId -> 
-                                                eprintfn "[userAtCoder] %d %s %s %s" submissionTime pId sId statusStr
-                                                let elm =
-                                                    let submissionId = int64(sId)
-                                                    try
-                                                        Ok(query{
-                                                            for submission in ctx.ContestLog.ProblemSubmissions do
-                                                                where (submission.ProblemProblemId = (problemSet.[pId]) && submission.ContestServerSubmissionId = (submissionId) && submission.ContestUsersUserId = userDbId)
-                                                                exactlyOne
-                                                        })
-                                                    with
-                                                    | :? Exception as e->
-                                                        eprintfn "[userAtCoder] Error %s" (e.Message)
-                                                        Error()
-                                                match elm with
-                                                | Ok x->
-                                                    eprintfn "[userAtCoder] update %d %d %d %d %s" (int64(sId)) userDbId (problemSet.[pId]) submissionTime statusStr
-                                                    x.SubmissionStatus <- statusStr
-                                                    x.SubmissionTime <- submissionTime
-                                                    ctx.SubmitUpdates()
-                                                | Error () ->
-                                                    eprintfn "[userAtCoder] insert %d %d %d %d %s" (int64(sId)) userDbId (problemSet.[pId]) submissionTime statusStr
-                                                    ctx.ContestLog.ProblemSubmissions.``Create(contestServerSubmissionId, contest_users_userId, problem_problemId, submission_status, submission_time)``
-                                                        (int64(sId),userDbId,problemSet.[pId],statusStr,submissionTime)|>ignore
-                                                    ctx.SubmitUpdates()
-                                            | None -> ()
-                                        | None -> ()
-                        )|>ignore
-                        ctx.SubmitUpdates()
-                        getSubmissionsFromPage (handle,userDbId) (page+1)
-                with
-                | :? WebException as we ->
-                    eprintfn "[userAtCoder] %s %s" we.Message we.Source
-                    ()
-            handleArr |> Array.map(fun x->getSubmissionsFromPage x 1) |> ignore
+            let submissionsJson = JsonValue.Load(getOldContestSubmissionUrl cId)
+            webSleep()
+            submissionsJson?response.AsArray()|>Array.filter(
+                    fun x->
+                        handleMap.ContainsKey(x?user_name.AsString())&&((x?is_accepted.AsInteger())=1)
+                )|>Array.map(
+                    fun x->
+                        let problemName = x?task_screen_name.AsString()
+                        eprintfn "[UserAtCoder] problemName %s" problemName
+                        let problemDbId = 
+                            query{
+                                for problem in ctx.ContestLog.Problem do
+                                    join contest in ctx.ContestLog.Contest on (problem.ContestContestId = contest.ContestId)
+                                    where (problem.ContestServerProblemId = problemName&&contest.ContestServerContestId = cId)
+                                    select (problem.ProblemId)
+                                    exactlyOne
+                            }
+
+                        let cuserDbId = 
+                            match handleMap.TryFind(x?user_name.AsString()) with
+                            | Some(x) -> x
+                            | None -> -1
+                        let cserverSubmissionId = x?submission_id.AsInteger64()
+                        let submissionTime = DateTimeOffset(DateTime.SpecifyKind(DateTime.Parse(x?created.AsString()),DateTimeKind.Local))
+                        let isInDb=
+                            query{
+                                for submission in ctx.ContestLog.ProblemSubmissions do
+                                    exists (submission.ContestServerSubmissionId = cserverSubmissionId&& submission.ProblemProblemId = problemDbId && submission.ContestUsersUserId = cuserDbId)
+                            }
+                        if not isInDb then
+                            eprintfn "[UserAtCoder] insert submissions (%d,%d,%d,%s,%d)" cserverSubmissionId cuserDbId problemDbId (submissionStatusToString(atCoderStatus2Status(x?status.AsString()))) (submissionTime.ToUnixTimeSeconds())
+                            ctx.ContestLog.ProblemSubmissions.``Create(contestServerSubmissionId, contest_users_userId, problem_problemId, submission_status, submission_time)``
+                                (cserverSubmissionId,cuserDbId,problemDbId,submissionStatusToString( atCoderStatus2Status(x?status.AsString())),submissionTime.ToUnixTimeSeconds())|>ignore
+                        else
+                            ()
+                )|>ignore
+            ctx.SubmitUpdates()
+            ()
         )|>ignore
     with 
     | :? Exception as e ->
