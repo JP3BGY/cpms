@@ -14,8 +14,8 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="3.2.4" />
-    <PackageReference Include="MySqlConnector" Version="0.56.0" />
-    <PackageReference Include="SQLProvider" Version="1.1.68" />
+    <PackageReference Include="MySqlConnector" Version="0.61.0" />
+    <PackageReference Include="SQLProvider" Version="1.1.72" />
     <PackageReference Include="System.ComponentModel.TypeConverter" Version="4.3.0" />
     <PackageReference Include="System.Console" Version="4.3.1" />
     <PackageReference Include="System.Data.Common" Version="4.3.0" />
