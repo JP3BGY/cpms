@@ -411,20 +411,25 @@ let rec userCodeforces () =
         ()
             
     async{
-        eprintfn "[UserCodeforces] userCodeforces Start!"
-        let ctx = getDataContext()
-        let handles = 
-            query{
-                for watchingUser in ctx.ContestLog.WatchingUser do
-                    for user in ctx.ContestLog.ContestUsers do
-                        for server in ctx.ContestLog.ContestServer do
-                            where (user.UserId = watchingUser.ContestUsersUserId&&user.ContestServerContestServerId = server.ContestServerId && server.ContestServerName = "Codeforces")
-                            select user.ContestUserId
-            }|>Seq.toList
-        handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
-        eprintfn "[UserCodeforces] userCodeforces ends"
-        let nextCrawleTime = TimeSpan.FromMinutes(1.0)
-        Console.WriteLine ("[UserCodeforces] SleepTime {0}",nextCrawleTime)
-        Threading.Thread.Sleep(nextCrawleTime)
-        userCodeforces()|>Async.RunSynchronously|>ignore
+        try
+            eprintfn "[UserCodeforces] userCodeforces Start!"
+            let ctx = getDataContext()
+            let handles = 
+                query{
+                    for watchingUser in ctx.ContestLog.WatchingUser do
+                        for user in ctx.ContestLog.ContestUsers do
+                            for server in ctx.ContestLog.ContestServer do
+                                where (user.UserId = watchingUser.ContestUsersUserId&&user.ContestServerContestServerId = server.ContestServerId && server.ContestServerName = "Codeforces")
+                                select user.ContestUserId
+                }|>Seq.toList
+            handles|>List.map(getUserSubmissions>>insertUserSubmissions)|>ignore
+            eprintfn "[UserCodeforces] userCodeforces ends"
+            let nextCrawleTime = TimeSpan.FromMinutes(1.0)
+            Console.WriteLine ("[UserCodeforces] SleepTime {0}",nextCrawleTime)
+            Threading.Thread.Sleep(nextCrawleTime)
+            userCodeforces()|>Async.RunSynchronously|>ignore
+        with
+        | :? Exception as e->
+            eprintfn "[UserCodeforces] Erro occured: %s" e.Message
+            ()
     }
