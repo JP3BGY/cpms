@@ -135,7 +135,7 @@ type VirtualContestController (logger : ILogger<VirtualContestController>) =
                 }|>Seq.isEmpty
             if notInContest then
                 try 
-                    let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+                    let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead)
                     use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
                                                            transactionopt,
                                                            TransactionScopeAsyncFlowOption.Enabled)

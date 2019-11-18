@@ -49,19 +49,23 @@ let getProblemsOfVirtualContest dbId (userInfo:UserInfo) =
     let elm = 
         query{
             for vcon in ctx.ContestLog.VirtualContest do
-                where (vcon.IdvirtualContest = dbId && (vcon.CreatedUserUserIduser = userInfo.dbId || vcon.StartTime >= nowUnixTime))
+                where (vcon.IdvirtualContest = dbId )
         }|>Seq.map(fun x->x.MapTo<VContestDb>())
         |>Seq.map(getVirtualContest)
     if Seq.isEmpty elm then
         Error("No such contest found or you have no permission to see.")
     else 
+        let head = Seq.head elm
         let problems = 
-            query{
-                for vconProblem in ctx.ContestLog.VirtualContestProblems do
-                    join problem in ctx.ContestLog.Problem on (vconProblem.ProblemProblemId=problem.ProblemId)
-                    where (vconProblem.VirtualContestIdvirtualContest = dbId)
-                    select (problem)
-            }|>Seq.map(fun x-> problemDb2Problem (x.MapTo<ProblemDb>()))|>Seq.toArray
+            if (head.creator.dbId = userInfo.dbId || head.startTime <= nowUnixTime) then
+                query{
+                    for vconProblem in ctx.ContestLog.VirtualContestProblems do
+                        join problem in ctx.ContestLog.Problem on (vconProblem.ProblemProblemId=problem.ProblemId)
+                        where (vconProblem.VirtualContestIdvirtualContest = dbId)
+                        select (problem)
+                }|>Seq.map(fun x-> problemDb2Problem (x.MapTo<ProblemDb>()))|>Seq.toArray
+            else
+                Array.empty
         let submissions =
             query{
                 for vParticipant in ctx.ContestLog.VirtualContestParticipants do
@@ -114,7 +118,7 @@ let deleteContest (creatorInfo:UserInfo) dbId =
         Error("No such Virtual Contest found")
     else
         use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
-                                               TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable),
+                                               TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead),
                                                TransactionScopeAsyncFlowOption.Enabled)
         let delname = 
             query{
@@ -173,7 +177,7 @@ let modifyContest dbId (creatorInfo:UserInfo) startTime duration (problems:int[]
                 Error("already ended or soon will end")
             else 
                 use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
-                                                       TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable),
+                                                       TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead),
                                                        TransactionScopeAsyncFlowOption.Enabled)
                 elm.StartTime <- startTime
                 elm.EndTime <- startTime+duration
@@ -236,7 +240,7 @@ let createContest (creatorInfo:UserInfo) startTime duration (problems:int[]) nam
                 try
                     let ctx = getDataContext()
                     use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
-                                                           TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable),
+                                                           TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead),
                                                            TransactionScopeAsyncFlowOption.Enabled)
                     let contestElm=ctx.ContestLog.VirtualContest.``Create(createdUser_user_iduser, endTime, startTime)``(creatorInfo.dbId,startTime+duration,startTime)
                     ctx.SubmitUpdates()

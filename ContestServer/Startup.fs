@@ -14,6 +14,7 @@ open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.HttpsPolicy;
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Headers
+open Microsoft.AspNetCore.HttpOverrides
 open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Authentication.OAuth
@@ -38,6 +39,9 @@ type Startup private () =
     // This method gets called by the runtime. Use this method to add services to the container.
     member this.ConfigureServices(services: IServiceCollection) =
         // Add framework services.
+        services.Configure<ForwardedHeadersOptions>(fun (options:ForwardedHeadersOptions) ->
+                options.ForwardedHeaders <- ForwardedHeaders.All
+                ()) |> ignore
         services.AddAuthentication(fun options ->
                 options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme
                 options.DefaultChallengeScheme <- "GitHub"
@@ -142,7 +146,7 @@ type Startup private () =
                                                     if x then 
                                                         context.Identity.AddClaim(Claim("Permission","User"))
                                                         try 
-                                                            let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.Serializable)
+                                                            let transactionopt = TransactionOptions(Timeout=TimeSpan.Zero,IsolationLevel=IsolationLevel.RepeatableRead)
                                                             use transaction = new TransactionScope(TransactionScopeOption.RequiresNew,
                                                                                                    transactionopt,
                                                                                                    TransactionScopeAsyncFlowOption.Enabled)
@@ -175,10 +179,11 @@ type Startup private () =
 
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
     member this.Configure(app: IApplicationBuilder, env: IWebHostEnvironment) =
+        app.UseForwardedHeaders() |> ignore
         if (env.IsDevelopment()) then
             app.UseDeveloperExceptionPage() |> ignore
         
-        app.UseHttpsRedirection() |> ignore
+        //app.UseHttpsRedirection() |> ignore
         app.UseStaticFiles() |> ignore
         app.UseRouting() |> ignore
 

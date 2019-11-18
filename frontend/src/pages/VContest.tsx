@@ -29,7 +29,7 @@ class VContestDetails extends React.Component<{match:match<{DbId:string}>,modify
     }
     render(){
         const details = this.state.details;
-        if(details){
+        if(details!==undefined&&details&&details!==null){
             const join = ()=>{
                 Api.apiCall(1,"/api/virtualcontest/join/"+details.vContest.dbId).catch((e)=>{
                     console.log("error ",e);
@@ -58,17 +58,34 @@ class VContestDetails extends React.Component<{match:match<{DbId:string}>,modify
             })
             details.submissions.forEach(elm => {
                 const idx = problemMap.get(elm.problemId);
-                if(idx){
-                    const cur=tableElm.get(elm.userId);
-                    if(cur&&(!cur[idx]||cur[idx].submissionStatus!=="AC"&&cur[idx].submissionTime<elm.submissionTime)){
-                        cur[idx]=elm;
+                if(idx!==undefined){
+                    let cur=tableElm.get(elm.userId);
+                    if(cur===undefined){
+                        cur=[];
+                        cur.length=details.problems.length;
+                    }
+                    if(cur!==undefined&&(!cur[idx]||(cur[idx].submissionTime<elm.submissionTime))){
+                        if(elm.submissionTime<details.vContest.endTime){
+                            cur[idx]=elm;
+                        }else if((!cur[idx]||cur[idx].submissionStatus!=="AC")&&elm.submissionStatus==="AC"){
+                            cur[idx]=elm;
+                        }
                     }
                 }
             });
             let body=[...tableElm].map((item)=>{
-                const probs = item[1].map((item,idx)=>(
-                    <td><a href={item.url}>{item.submissionStatus}</a></td>
-                ))
+                let probs = item[1].map((item,idx)=>{
+                    if(item === undefined){
+                        return (<td></td>);
+                    }
+                    return (
+                    <td><a href={item.url}>{item.submissionStatus==="AC"&&item.submissionTime<details.vContest.startTime?"Already ACed":item.submissionStatus==="AC"&&item.submissionTime>details.vContest.endTime?"ACed after contest":item.submissionStatus}</a></td>
+                );})
+                for (let index = 0; index < probs.length;index++) {
+                    if(probs[index]===undefined){
+                        probs[index]=(<td></td>);
+                    }
+                }
                 const userInfo = dbId2User.get(item[0]) as Api.UserInfo;
                 return (
                     <tr>
