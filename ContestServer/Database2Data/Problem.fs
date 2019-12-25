@@ -3,6 +3,7 @@ open System
 open ContestServer.Setting
 open ContestServer.Types
 open Scraper.Submission
+open System.Text.RegularExpressions
 
 type ProblemDb =
     {
@@ -25,6 +26,11 @@ let problem2Url serverName contestId problemId =
     | "AtCoder" -> Ok ("https://atcoder.jp/contests/"+contestId+"/tasks/"+problemId)
     | "TopCoder" -> Error "Not supported"
     | _ -> Error "Not supported"
+let (|ParseRegex|_|) regex str =
+   let m = Regex(regex).Match(str)
+   if m.Success
+   then Some (List.tail [ for x in m.Groups -> x.Value ])
+   else None
 let problemDb2Problem = 
         fun problemDb->
             let ctx = getDataContext()
@@ -74,6 +80,27 @@ let getProblemFromProblemId problemId =
             exactlyOne
     }|>fun x->x.MapTo<ProblemDb>()
     |>problemDb2Problem
+let getProblemFromContestServerIds contestServerName contestId problemId =
+    let ctx=getDataContext()
+    query{
+        for problem in ctx.ContestLog.Problem do
+            for contest in ctx.ContestLog.Contest do
+                for cserver in ctx.ContestLog.ContestServer do
+                    where (problem.ContestContestId = contest.ContestId
+                            && contest.ContestServerContestServerId = cserver.ContestServerId 
+                            && cserver.ContestServerName = contestServerName 
+                            && problem.ContestServerProblemId = problemId && contest.ContestServerContestId = contestId)
+                    select problem
+                    exactlyOne
+    }|>fun x->x.MapTo<ProblemDb>()
+    |>problemDb2Problem
+let url2Problem url = 
+    match url with
+    | ParseRegex "https://atcoder.jp/contests/(.+)/tasks/(.+)" [contestId;problemId] -> Ok(getProblemFromContestServerIds "AtCoder" contestId problemId)
+    | ParseRegex "https://(.+).contest.atcoder.jp/tasks/(.+)" [contestId;problemId] -> Ok(getProblemFromContestServerIds "AtCoder" contestId problemId)
+    | ParseRegex "https://codeforces.com/contest/(.+)/problem/(.+)" [contestId;problemId] -> Ok(getProblemFromContestServerIds "Codeforces" contestId problemId)
+    | ParseRegex "https://codeforces.com/problemset/problem/(.+)/(.+)" [contestId;problemId] -> Ok(getProblemFromContestServerIds "Codeforces" contestId problemId)
+    | _ -> Error("Not found")
 let getProblems () =
     let ctx = getDataContext()
     query{

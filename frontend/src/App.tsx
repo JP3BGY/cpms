@@ -1,11 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Link } from "react-router-dom";
-import Home from './pages/Home'
-import MySetting from './pages/MySetting'
-import Contest from './pages/Contest'
-import Problem from './pages/Problem'
-import VContest from './pages/VContest'
-import * as Api from './api/ApiCall'
+import { BrowserRouter as Router, Link, Route } from "react-router-dom";
+import * as Api from './api/ApiCall';
+import Contest from './pages/Contest';
+import Home from './pages/Home';
+import MySetting from './pages/MySetting';
+import Problem from './pages/Problem';
+import VContest from './pages/VContest';
 const Header:React.FC = () =>{
   return (
     <header>
@@ -39,12 +39,23 @@ interface VirtualContestInfo {
   duration:number,
   name:string,
 }
-class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{url:string,name:string}>,vinfo:VirtualContestInfo}>{
+interface vcontestState {
+  modifyId: number | null;
+  selected: Map<number, {
+    url: string;
+    name: string;
+  }>;
+  url:string;
+  vinfo: VirtualContestInfo;
+}
+
+class App extends React.Component<{},vcontestState>{
   constructor(props:{}){
     super(props);
     this.state={
       modifyId:null,
       selected:new Map<number,{url:string,name:string}>(),
+      url:"",
       vinfo:{
         isSelectedVisible: true,
         date: "",
@@ -126,6 +137,14 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
       selected: s.selected.set(p.dbId,{url:p.url,name:p.name}),
     }));
   }
+  addProblemFromUrl(url:string){
+    Api.apiCall(0,"/api/problem/url?problemUrl="+encodeURIComponent(url))
+      .then((res)=>{
+        this.setState(state=>({
+          selected: state.selected.set(res.dbId,{url:res.url,name:res.name})
+        }))
+      });
+  }
   delProblem(p:Api.Problem|[number,{url:string,name:string}]){
     if('dbId' in p){
       this.setState((s)=>{
@@ -169,6 +188,7 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
           this.setState((s)=>({
             selected:new Map<number,{url:string,name:string}>(),
             modifyId:null,
+            url: "",
             vinfo:{
               isSelectedVisible: true,
               date: "",
@@ -198,6 +218,11 @@ class App extends React.Component<{},{modifyId:number|null,selected:Map<number,{
     let fixedSelected = (
       <footer>
         <input type="checkbox" name="isSelectedVisible" checked={this.state.vinfo.isSelectedVisible} onChange={(e)=>{this.onVinfoChange(e.target.name,e.target.checked)}}/>
+        <input type="text" name="url" 
+          value={this.state.url} onChange={(e)=>{let value=e.target.value;this.setState((s)=>({url:value}));}}
+          onKeyUp={(e)=>{if(this.state.url!=""&&e.key==="Enter"){this.addProblemFromUrl(this.state.url);this.setState({url:""});}}} 
+          onBlur={(e)=>{if(this.state.url!=""){this.addProblemFromUrl(this.state.url);this.setState({url:""});}}} 
+         />
         <table>
           {selectedProblems}
         </table>

@@ -39,6 +39,15 @@ type ProblemController (logger : ILogger<ProblemController>) =
     member __.Get(contestId:int) =
         let elms = getProblemsOfContest contestId
         base.Ok(elms)
-
-
-        
+    [<HttpGet("url")>]
+    member __.LoginWithRedirect([<FromQuery>]problemUrl:string) =
+        match (url2Problem problemUrl) with
+        | Ok problem -> base.Ok(problem):>ActionResult
+        | Error _ -> 
+            base.NotFound(
+                {
+                    code = 404s
+                    result = "Problem not found"
+                    url = null
+                }
+            ):>ActionResult
