@@ -25,9 +25,9 @@
     <ProjectReference Include="..\scraper\scraper.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FSharp.Data" Version="3.2.4" />
+    <PackageReference Include="FSharp.Data" Version="3.3.2" />
     <PackageReference Include="MySqlConnector" Version="0.61.0" />
-    <PackageReference Include="SQLProvider" Version="1.1.71" />
+    <PackageReference Include="SQLProvider" Version="1.1.76" />
   </ItemGroup>
 
 </Project>
