@@ -191,11 +191,13 @@ let rec atcoder () =
         eprintfn "[AtCoder] Start %s" id
         try
             let standings=
-                Http.RequestString(getContestResultUrl(id))
+                Http.RequestString(getContestResultUrl(id),cookieContainer=atcoderCookie())
                     |>JsonValue.Parse
+            eprintfn "[AtCoder] Got Standings %s" (standings.ToString())
             webSleep()
             let ratingChange = 
                 JsonValue.Load(getContestRatingChangeUrl(id))
+            eprintfn "[AtCoder] Got ratingChange %s" (ratingChange.ToString())
             let ratings = 
                 ratingChange.AsArray()|>Array.map(fun x-> (x?UserScreenName.AsString(),x?NewRating.AsInteger()))|>Map.ofArray
             if standings?Fixed.AsBoolean() then
@@ -253,6 +255,11 @@ let rec atcoder () =
             ()
         | :? TransactionAbortedException as te ->
             eprintfn "[AtCoder] Transaction Error %s %s" id te.Message
+            GC.Collect()
+            ()
+        | :? System.Exception as e ->
+            eprintfn "[AtCoder] Error %s %s" id e.Message
+            eprintfn "Maybe you must login to atcoder."
             GC.Collect()
             ()
 

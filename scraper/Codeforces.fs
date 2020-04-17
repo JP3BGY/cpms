@@ -430,6 +430,6 @@ let rec userCodeforces () =
             userCodeforces()|>Async.RunSynchronously|>ignore
         with
         | :? Exception as e->
-            eprintfn "[UserCodeforces] Erro occured: %s" e.Message
+            eprintfn "[UserCodeforces] Erro occured: %s" (e.ToString())
             ()
     }
