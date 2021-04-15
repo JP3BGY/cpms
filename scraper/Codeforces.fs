@@ -11,7 +11,7 @@ open FSharp.Data.Runtime.Caching
 open MySql.Data
 let rand = Random()
 let webSleep() = 
-    Threading.Thread.Sleep (TimeSpan.FromSeconds(1.0+rand.NextDouble()*5.0))
+    Threading.Thread.Sleep (TimeSpan.FromSeconds(300.0+rand.NextDouble()*300.0))
 let cfCachePrefix = "codeforces"
 let codeforcesCache = createInternetFileCache (Path.Combine(gCachePrefix,cfCachePrefix)) (TimeSpan.MaxValue)
 let cfDeleteAllCache () =
